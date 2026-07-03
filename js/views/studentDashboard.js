@@ -99,7 +99,7 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
     container.innerHTML = `
         <!-- Welcome Banner -->
         <div class="welcome-banner">
-            <h1>Hello, ${currentUser.name}!</h1>
+            <h1>Hello, ${user.name}!</h1>
             <p>Welcome to your exam console. Below are the tests available for you today. Ensure you are in a quiet workspace before clicking Start.</p>
             <div class="welcome-banner-shapes"></div>
         </div>
