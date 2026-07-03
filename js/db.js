@@ -1,6 +1,21 @@
 /* -------------------------------------------------------------
-   TestAbhi - Local Database & localStorage Wrapper
+   TestAbhi - Firebase Firestore Database Layer
+   (Replaces localStorage — data is now shared across all devices)
 ------------------------------------------------------------- */
+
+import { db } from './firebase.js';
+import {
+    collection, doc, getDoc, getDocs, setDoc, addDoc, writeBatch, deleteDoc
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// =============================================================
+// In-memory cache — populated on initDB(), reads are sync-fast
+// =============================================================
+const cache = {
+    tests: [],
+    users: {},
+    proctor_logs: []
+};
 
 const DEFAULT_TESTS = [
     {
@@ -309,100 +324,132 @@ const DEFAULT_PROCTOR_LOGS = [
 ];
 
 // Initialize Storage
-export function initDB() {
-    if (!localStorage.getItem("testabhi_initialized_v4")) {
-        localStorage.setItem("testabhi_tests", JSON.stringify(DEFAULT_TESTS));
-        localStorage.setItem("testabhi_users", JSON.stringify(DEFAULT_USERS));
-        localStorage.setItem("testabhi_proctor_logs", JSON.stringify(DEFAULT_PROCTOR_LOGS));
-        localStorage.setItem("testabhi_initialized", "true");
-        localStorage.setItem("testabhi_initialized_v4", "true");
+export async function initDB() {
+    // Check if Firestore has been seeded before
+    const metaRef = doc(db, 'app_meta', 'config');
+    const metaSnap = await getDoc(metaRef);
+
+    if (!metaSnap.exists() || !metaSnap.data().initialized) {
+        // Seed default data using batch write
+        const batch = writeBatch(db);
+
+        DEFAULT_TESTS.forEach(test => {
+            batch.set(doc(db, 'tests', test.id), JSON.parse(JSON.stringify(test)));
+        });
+
+        Object.keys(DEFAULT_USERS).forEach(username => {
+            batch.set(doc(db, 'users', username), DEFAULT_USERS[username]);
+        });
+
+        DEFAULT_PROCTOR_LOGS.forEach(log => {
+            batch.set(doc(db, 'proctor_logs', log.id), log);
+        });
+
+        batch.set(metaRef, { initialized: true });
+        await batch.commit();
     }
+
+    // Load everything into cache
+    const [testsSnap, usersSnap, logsSnap] = await Promise.all([
+        getDocs(collection(db, 'tests')),
+        getDocs(collection(db, 'users')),
+        getDocs(collection(db, 'proctor_logs'))
+    ]);
+
+    cache.tests = testsSnap.docs.map(d => d.data());
+    cache.users = {};
+    usersSnap.docs.forEach(d => { cache.users[d.id] = d.data(); });
+    cache.proctor_logs = logsSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 }
 
-// Get Data
-export function getTests() {
-    initDB();
-    return JSON.parse(localStorage.getItem("testabhi_tests"));
+// =======================
+// Sync reads (from cache)
+// =======================
+export function getTests() { return cache.tests; }
+export function getUsers() { return cache.users; }
+export function getProctorLogs() { return cache.proctor_logs; }
+
+// =======================
+// Async writes (Firestore + update cache)
+// =======================
+export async function saveTests(tests) {
+    cache.tests = tests;
+
+    // Get existing test IDs in Firestore
+    const existingSnap = await getDocs(collection(db, 'tests'));
+    const existingIds = existingSnap.docs.map(d => d.id);
+    const newIds = tests.map(t => t.id);
+    const toDelete = existingIds.filter(id => !newIds.includes(id));
+
+    const batch = writeBatch(db);
+    tests.forEach(test => batch.set(doc(db, 'tests', test.id), JSON.parse(JSON.stringify(test))));
+    toDelete.forEach(id => batch.delete(doc(db, 'tests', id)));
+    await batch.commit();
 }
 
-export function saveTests(tests) {
-    localStorage.setItem("testabhi_tests", JSON.stringify(tests));
+export async function saveUsers(users) {
+    cache.users = users;
+    const batch = writeBatch(db);
+    Object.keys(users).forEach(username => {
+        batch.set(doc(db, 'users', username), users[username]);
+    });
+    await batch.commit();
 }
 
-export function getUsers() {
-    initDB();
-    return JSON.parse(localStorage.getItem("testabhi_users"));
-}
-
-export function saveUsers(users) {
-    localStorage.setItem("testabhi_users", JSON.stringify(users));
-}
-
-export function getProctorLogs() {
-    initDB();
-    return JSON.parse(localStorage.getItem("testabhi_proctor_logs"));
-}
-
-export function addProctorLog(log) {
-    const logs = getProctorLogs();
-    log.id = "log-" + Date.now();
+export async function addProctorLog(log) {
+    log.id = 'log-' + Date.now();
     log.timestamp = new Date().toISOString();
-    logs.unshift(log); // newest first
-    localStorage.setItem("testabhi_proctor_logs", JSON.stringify(logs));
+    cache.proctor_logs.unshift(log);
+    await addDoc(collection(db, 'proctor_logs'), log);
 }
 
+// ==================
+// Auth helpers
+// ==================
 export function authenticateUser(username, password) {
-    initDB();
-    const users = getUsers();
-    const user = users[username.toLowerCase().trim()];
+    const user = cache.users[username.toLowerCase().trim()];
     if (user && user.password === password) {
         return { username: username.toLowerCase().trim(), ...user };
     }
     return null;
 }
 
-export function saveTestAttempt(username, attempt) {
-    const users = getUsers();
-    if (users[username]) {
-        users[username].history.unshift(attempt);
-        saveUsers(users);
-        return true;
-    }
-    return false;
-}
-
-export function registerUser(username, password, name, role) {
-    const users = getUsers();
+export async function registerUser(username, password, name, role) {
     const cleanUsername = username.toLowerCase().trim();
-    
+
     if (cleanUsername === 'admin' || role === 'admin') {
         return { success: false, message: "Cannot register a new Administrator account." };
     }
-    
-    if (users[cleanUsername]) {
-        return { success: false, message: "Username already exists." };
+    if (cache.users[cleanUsername]) {
+        return { success: false, message: "Username already exists. Please choose another." };
     }
-    
-    users[cleanUsername] = {
-        role: role,
-        password: password,
-        name: name.trim(),
-        history: []
-    };
-    
-    saveUsers(users);
-    return { success: true, message: "Registration successful!" };
+
+    const newUser = { role, password, name: name.trim(), history: [] };
+    cache.users[cleanUsername] = newUser;
+    await setDoc(doc(db, 'users', cleanUsername), newUser);
+    return { success: true, message: "Registration successful! You can now sign in." };
 }
 
-export function updateUserProfile(username, newName, newPassword) {
-    const users = getUsers();
+export async function updateUserProfile(username, newName, newPassword) {
     const cleanUsername = username.toLowerCase().trim();
-    
-    if (users[cleanUsername]) {
-        if (newName) users[cleanUsername].name = newName.trim();
-        if (newPassword) users[cleanUsername].password = newPassword;
-        saveUsers(users);
+    if (cache.users[cleanUsername]) {
+        if (newName) cache.users[cleanUsername].name = newName.trim();
+        if (newPassword) cache.users[cleanUsername].password = newPassword;
+        await setDoc(doc(db, 'users', cleanUsername), cache.users[cleanUsername]);
         return { success: true, message: "Profile updated successfully!" };
     }
     return { success: false, message: "User not found." };
+}
+
+export async function saveTestAttempt(username, attempt) {
+    const cleanUsername = username.toLowerCase().trim();
+    if (cache.users[cleanUsername]) {
+        if (!cache.users[cleanUsername].history) cache.users[cleanUsername].history = [];
+        cache.users[cleanUsername].history.unshift(attempt);
+        await setDoc(doc(db, 'users', cleanUsername), cache.users[cleanUsername]);
+        return true;
+    }
+    return false;
 }

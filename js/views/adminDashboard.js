@@ -188,12 +188,12 @@ export function renderAdminDashboard(user) {
 
         // Bind Delete Action
         paneAnalytics.querySelectorAll(".delete-test-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
                 const testId = btn.getAttribute("data-id");
                 const test = tests.find(t => t.id === testId);
                 if (test && confirm(`Are you sure you want to delete assessment "${test.title}"?`)) {
                     const updated = tests.filter(t => t.id !== testId);
-                    saveTests(updated);
+                    await saveTests(updated);
                     showToast("Test configuration deleted.", "info");
                     renderAnalytics();
                 }
@@ -213,7 +213,7 @@ export function renderAdminDashboard(user) {
             if (!file) return;
 
             const reader = new FileReader();
-            reader.onload = (event) => {
+            reader.onload = async (event) => {
                 try {
                     const imported = JSON.parse(event.target.result);
                     if (!imported.id || !imported.title || !Array.isArray(imported.questions)) {
@@ -226,7 +226,7 @@ export function renderAdminDashboard(user) {
                     }
 
                     currentTests.push(imported);
-                    saveTests(currentTests);
+                    await saveTests(currentTests);
                     showToast(`Assessment "${imported.title}" imported successfully!`, "success");
                     renderAnalytics();
                 } catch (err) {
@@ -235,6 +235,7 @@ export function renderAdminDashboard(user) {
             };
             reader.readAsText(file);
         });
+
     }
 
     // -------------------------------------------------------------
@@ -354,9 +355,18 @@ export function renderAdminDashboard(user) {
             renderBuilderQuestions();
         });
 
-        paneBuilder.querySelector("#save-test-btn").addEventListener("click", () => {
-            saveTestFromBuilder();
+        paneBuilder.querySelector("#save-test-btn").addEventListener("click", async () => {
+            const btn = paneBuilder.querySelector("#save-test-btn");
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+            try {
+                await saveTestFromBuilder();
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = 'Create Assessment <i class="fas fa-save"></i>';
+            }
         });
+
 
         const checkbox = paneBuilder.querySelector("#test-section-wise-timing");
         const managerWrapper = paneBuilder.querySelector("#builder-sections-manager-wrapper");
@@ -1208,7 +1218,7 @@ export function renderAdminDashboard(user) {
         });
     }
 
-    function saveTestFromBuilder() {
+    async function saveTestFromBuilder() {
         const titleEl = paneBuilder.querySelector("#test-title");
         const descEl = paneBuilder.querySelector("#test-desc");
         const durationEl = paneBuilder.querySelector("#test-duration");
@@ -1288,7 +1298,7 @@ export function renderAdminDashboard(user) {
         };
 
         tests.push(newTest);
-        saveTests(tests);
+        await saveTests(tests);
         showToast("Assessment created successfully!", "success");
 
         // Clear builder
@@ -1299,6 +1309,7 @@ export function renderAdminDashboard(user) {
         // Go back to analytics overview tab
         switchTab('analytics');
     }
+
 
     // -------------------------------------------------------------
     // RENDER: Live Monitor Tab

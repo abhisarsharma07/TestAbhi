@@ -118,12 +118,16 @@ export function renderProfileView(user) {
     const nameInput = container.querySelector("#profile-name");
     const passwordInput = container.querySelector("#profile-password");
 
-    form.addEventListener("submit", (e) => {
+    form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const submitBtn = form.querySelector("[type='submit']");
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
         const updatedName = nameInput.value.trim();
         const updatedPassword = passwordInput.value;
 
-        const res = updateUserProfile(user.username, updatedName, updatedPassword || null);
+        const res = await updateUserProfile(user.username, updatedName, updatedPassword || null);
         if (res.success) {
             showToast(res.message, "success");
             // Update active session data name
@@ -133,7 +137,7 @@ export function renderProfileView(user) {
             // Redirect back to dashboard based on role
             setTimeout(() => {
                 if (user.role === 'admin') {
-                    navigate('admin');
+                    navigate('super-admin');
                 } else if (user.role === 'faculty') {
                     navigate('faculty');
                 } else {
@@ -142,8 +146,11 @@ export function renderProfileView(user) {
             }, 1000);
         } else {
             showToast(res.message, "error");
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Save Changes <i class="fas fa-save"></i>';
         }
     });
+
 
     container.querySelector("#profile-back-btn").addEventListener("click", () => {
         if (user.role === 'admin') {

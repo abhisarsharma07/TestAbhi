@@ -95,13 +95,14 @@ export function renderSuperAdminDashboard(currentUser) {
 
         // Bind Actions
         container.querySelectorAll(".toggle-role-btn").forEach(btn => {
-            btn.addEventListener("click", () => {
+            btn.addEventListener("click", async () => {
+                btn.disabled = true;
                 const targetUser = btn.dataset.username;
                 const activeUsers = getUsers();
                 if (activeUsers[targetUser]) {
                     const currentRole = activeUsers[targetUser].role;
                     activeUsers[targetUser].role = currentRole === 'student' ? 'faculty' : 'student';
-                    saveUsers(activeUsers);
+                    await saveUsers(activeUsers);
                     showToast(`Role updated for user @${targetUser}.`, "success");
                     renderPanel();
                 }
@@ -111,10 +112,10 @@ export function renderSuperAdminDashboard(currentUser) {
         container.querySelectorAll(".delete-user-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 const targetUser = btn.dataset.username;
-                showDeleteConfirmationModal(targetUser, () => {
+                showDeleteConfirmationModal(targetUser, async () => {
                     const activeUsers = getUsers();
                     delete activeUsers[targetUser];
-                    saveUsers(activeUsers);
+                    await saveUsers(activeUsers);
                     showToast(`User @${targetUser} deleted from directory.`, "success");
                     renderPanel();
                 });

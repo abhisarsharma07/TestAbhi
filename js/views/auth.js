@@ -118,9 +118,13 @@ export function renderAuthView(onLoginSuccess) {
             const passwordInput = container.querySelector("#reg-password");
             const roleSelect = container.querySelector("#reg-role");
             
-            form.addEventListener("submit", (e) => {
+            form.addEventListener("submit", async (e) => {
                 e.preventDefault();
-                const res = registerUser(
+                const submitBtn = form.querySelector("[type='submit']");
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
+
+                const res = await registerUser(
                     usernameInput.value,
                     passwordInput.value,
                     nameInput.value,
@@ -133,12 +137,15 @@ export function renderAuthView(onLoginSuccess) {
                     renderContent();
                 } else {
                     showToast(res.message, "error");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Register Account <i class="fas fa-user-plus"></i>';
                     container.querySelector(".auth-card").classList.add("shake");
                     setTimeout(() => {
                         container.querySelector(".auth-card").classList.remove("shake");
                     }, 500);
                 }
             });
+
             
             container.querySelector("#go-to-login").addEventListener("click", (e) => {
                 e.preventDefault();

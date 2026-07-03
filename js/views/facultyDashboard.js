@@ -1,11 +1,3 @@
-/* -------------------------------------------------------------
-   TestAbhi - Faculty Dashboard
-   (Faculty can manage tests via the Test Creator. They see the
-    test builder but NOT the super-admin user management panel.)
-------------------------------------------------------------- */
-
-import { getTests } from '../db.js';
-import { navigate } from '../app.js';
 import { renderAdminDashboard } from './adminDashboard.js';
 
 export function renderFacultyDashboard(user) {

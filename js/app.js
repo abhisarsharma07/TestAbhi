@@ -20,12 +20,47 @@ let currentPage = 'auth'; // 'auth', 'student', 'faculty', 'admin', 'super-admin
 let activeParams = null; // Arguments to pass to views
 
 // Initial initialization
-function initApp() {
-    initDB();
-    
-    // Restore Theme preference
+async function initApp() {
+    // Show loading spinner while Firebase connects
+    const appEl = document.getElementById("app");
+    appEl.innerHTML = `
+        <div style="
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; gap: 1.25rem; color: var(--text-secondary);
+        ">
+            <div style="
+                width: 52px; height: 52px; border-radius: 50%;
+                border: 4px solid var(--border-color);
+                border-top-color: hsl(239, 84%, 67%);
+                animation: spin 0.8s linear infinite;
+            "></div>
+            <p style="font-size: 1rem; font-weight: 500;">Connecting to TestAbhi...</p>
+        </div>
+        <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    `;
+
+    // Restore theme early so loading screen respects it
     const savedTheme = localStorage.getItem("testabhi_theme") || "dark";
     document.documentElement.setAttribute("data-theme", savedTheme);
+
+    try {
+        await initDB(); // Fetch all data from Firestore into cache
+    } catch (err) {
+        appEl.innerHTML = `
+            <div style="
+                display: flex; flex-direction: column; align-items: center; justify-content: center;
+                min-height: 100vh; gap: 1rem; text-align: center; padding: 2rem;
+            ">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2.5rem; color: hsl(0, 85%, 60%);"></i>
+                <h2 style="color: var(--text-primary);">Connection Failed</h2>
+                <p style="color: var(--text-secondary);">Could not connect to the database. Please check your internet connection and try again.</p>
+                <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 0.5rem;">
+                    <i class="fas fa-redo"></i> Retry
+                </button>
+            </div>
+        `;
+        return;
+    }
 
     // Restore login session
     const sessionUser = sessionStorage.getItem("testabhi_session");
@@ -148,14 +183,15 @@ function render() {
             viewNode = renderTestInterface(
                 currentUser,
                 test,
-                (attemptRecord) => {
+                async (attemptRecord) => {
                     // Save attempt to user's history
-                    saveTestAttempt(currentUser.username, attemptRecord);
+                    await saveTestAttempt(currentUser.username, attemptRecord);
                     showToast("Test submitted successfully!", "success");
                     // Route to results screen
                     navigate('results', attemptRecord);
                 }
             );
+
             break;
             
         case 'results':
