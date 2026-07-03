@@ -298,16 +298,66 @@ function showInstructionOverlay(test, onConfirm) {
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
 
-    const negLabel = test.negativeMarking && test.negativeMarking < 0
-        ? `<div class="instruction-row warn"><i class="fas fa-minus-circle"></i> <span>Negative marking active: <strong>${test.negativeMarking}</strong> per wrong answer. Unanswered questions score 0.</span></div>`
-        : `<div class="instruction-row ok"><i class="fas fa-check-circle"></i> <span>No negative marking for this test.</span></div>`;
+    const globalNeg = parseFloat(test.negativeMarking || 0);
+    const hasSectionNeg = test.sectionWiseTiming && test.sections && test.sections.some(s => {
+        const sNeg = s.negativeMarking !== null && s.negativeMarking !== undefined ? parseFloat(s.negativeMarking) : globalNeg;
+        return sNeg < 0;
+    });
+    const isNegativeMarkingActive = (globalNeg < 0) || hasSectionNeg;
 
-    const sections = test.sectionWiseTiming && test.sections
-        ? test.sections.map(s => {
-            const sNeg = s.negativeMarking !== null && s.negativeMarking !== undefined ? s.negativeMarking : (test.negativeMarking || 0);
-            return `<li><strong>${s.name}</strong> — ${s.duration} min${sNeg < 0 ? `, negative: ${sNeg}` : ''}</li>`;
-        }).join('')
-        : `<li>Single section — ${test.duration} minutes</li>`;
+    let negLabel = '';
+    if (isNegativeMarkingActive) {
+        if (test.sectionWiseTiming && test.sections) {
+            negLabel = `<div class="instruction-row warn"><i class="fas fa-minus-circle"></i> <span>Negative marking is active (varies by section). See the table below. Unanswered questions score 0.</span></div>`;
+        } else {
+            negLabel = `<div class="instruction-row warn"><i class="fas fa-minus-circle"></i> <span>Negative marking active: <strong>${test.negativeMarking}</strong> per wrong answer. Unanswered questions score 0.</span></div>`;
+        }
+    } else {
+        negLabel = `<div class="instruction-row ok"><i class="fas fa-check-circle"></i> <span>No negative marking for this test.</span></div>`;
+    }
+
+    let examDetailsHtml = '';
+    if (test.sectionWiseTiming && test.sections) {
+        examDetailsHtml = `
+            <li><i class="far fa-clock"></i> Total Duration: <strong>${test.duration} minutes</strong></li>
+            <li><i class="far fa-question-circle"></i> Questions: <strong>${test.questions.length}</strong></li>
+            <li style="display: block; margin-top: 0.5rem;"><i class="fas fa-layer-group"></i> <strong>Sections Overview:</strong>
+                <div style="margin-top: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; background-color: var(--bg-card);">
+                    <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                        <thead>
+                            <tr style="background-color: rgba(0,0,0,0.02); border-bottom: 1px solid var(--border-color); color: var(--text-secondary);">
+                                <th style="padding: 0.6rem 0.8rem;">Section Name</th>
+                                <th style="padding: 0.6rem 0.8rem; text-align: center;">Duration</th>
+                                <th style="padding: 0.6rem 0.8rem; text-align: center;">Correct Answer</th>
+                                <th style="padding: 0.6rem 0.8rem; text-align: right;">Negative Mark</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${test.sections.map(s => {
+                                const sNeg = s.negativeMarking !== null && s.negativeMarking !== undefined ? parseFloat(s.negativeMarking) : globalNeg;
+                                return `
+                                    <tr style="border-bottom: 1px solid var(--border-color); color: var(--text-main);">
+                                        <td style="padding: 0.6rem 0.8rem; font-weight: 600;">${s.name}</td>
+                                        <td style="padding: 0.6rem 0.8rem; text-align: center; color: var(--text-secondary);">${s.duration} mins</td>
+                                        <td style="padding: 0.6rem 0.8rem; text-align: center; color: hsl(142, 70%, 45%); font-weight: 500;">+1.00</td>
+                                        <td style="padding: 0.6rem 0.8rem; text-align: right; color: ${sNeg < 0 ? 'hsl(355, 78%, 56%)' : 'var(--text-muted)'}; font-weight: 500;">
+                                            ${sNeg < 0 ? sNeg.toFixed(2) : '0.00'}
+                                        </td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            </li>
+        `;
+    } else {
+        examDetailsHtml = `
+            <li><i class="far fa-clock"></i> Duration: <strong>${test.duration} minutes</strong></li>
+            <li><i class="far fa-question-circle"></i> Questions: <strong>${test.questions.length}</strong></li>
+            <li><i class="fas fa-layer-group"></i> Sections: Single section</li>
+        `;
+    }
 
     overlay.innerHTML = `
         <div class="modal-content instruction-modal">
@@ -320,9 +370,7 @@ function showInstructionOverlay(test, onConfirm) {
             <div class="instruction-body">
                 <h3><i class="fas fa-info-circle"></i> Exam Details</h3>
                 <ul class="instruction-details-list">
-                    <li><i class="far fa-clock"></i> Duration: <strong>${test.duration} minutes</strong></li>
-                    <li><i class="far fa-question-circle"></i> Questions: <strong>${test.questions.length}</strong></li>
-                    <li><i class="fas fa-layer-group"></i> Sections: <ul style="margin-top:0.5rem;padding-left:1rem;">${sections}</ul></li>
+                    ${examDetailsHtml}
                 </ul>
 
                 <h3><i class="fas fa-shield-alt"></i> Marking Scheme</h3>

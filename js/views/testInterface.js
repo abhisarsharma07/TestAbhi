@@ -569,13 +569,17 @@ export function renderTestInterface(user, test, onSubmitTest) {
             // Resolve negative marking penalty for this question
             // Priority: section-level > global test level > 0
             let negPenalty = 0;
-            if (test.negativeMarking && test.negativeMarking < 0) {
-                negPenalty = test.negativeMarking; // e.g. -0.5, -1
+            const globalPenalty = parseFloat(test.negativeMarking || 0);
+            if (globalPenalty < 0) {
+                negPenalty = globalPenalty; // e.g. -0.5, -1
             }
             if (isSectionWise && q.sectionName && test.sections) {
                 const matchedSection = test.sections.find(s => s.name === q.sectionName);
                 if (matchedSection && matchedSection.negativeMarking !== null && matchedSection.negativeMarking !== undefined) {
-                    negPenalty = matchedSection.negativeMarking;
+                    const sectionPenalty = parseFloat(matchedSection.negativeMarking);
+                    if (!isNaN(sectionPenalty)) {
+                        negPenalty = sectionPenalty;
+                    }
                 }
             }
 
@@ -681,7 +685,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
             correctCount,
             wrongCount,
             unattemptedCount,
-            totalMarks: clampedMarks,
+            totalMarks: totalMarks,
             timeSpent,
             date: new Date().toISOString().split('T')[0],
             reviewDetails
