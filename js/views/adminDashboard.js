@@ -1659,6 +1659,7 @@ export function renderAdminDashboard(user) {
 // Call Google Gemini API to parse or generate questions
 // -------------------------------------------------------------
 async function callGeminiAPI(apiKey, promptText) {
+    const cleanKey = apiKey.trim();
     const systemInstruction = `You are a helpful AI Assessment Agent for TestAbhi.
 Your task is to parse copy-pasted exam questions or generate new questions based on the user's prompt.
 Analyze the user's text and extract or generate the questions correctly. Fix spelling, capitalization, and formatting anomalies where possible.
@@ -1706,44 +1707,40 @@ The JSON structure must match this EXACT schema:
         }
     };
 
-    // Try V1 (Stable Production API Version) first
-    const urlV1 = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    try {
-        const response = await fetch(urlV1, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bodyObj)
-        });
+    // List of models and versions to attempt in order of performance and availability
+    const models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash-exp'];
+    const versions = ['v1', 'v1beta'];
 
-        if (response.ok) {
-            const data = await response.json();
-            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (textResponse) {
-                return JSON.parse(textResponse.trim());
+    let lastError = null;
+
+    for (let model of models) {
+        for (let ver of versions) {
+            const url = `https://generativelanguage.googleapis.com/${ver}/models/${model}:generateContent?key=${cleanKey}`;
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyObj)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (textResponse) {
+                        return JSON.parse(textResponse.trim());
+                    }
+                } else {
+                    const errData = await response.json().catch(() => ({}));
+                    const errMsg = errData.error?.message || response.statusText;
+                    lastError = new Error(`Model ${model} (${ver}) returned ${response.status}: ${errMsg}`);
+                    console.warn(lastError.message);
+                }
+            } catch (e) {
+                lastError = e;
+                console.warn(`Fetch error for ${model} (${ver}):`, e);
             }
-        } else {
-            console.warn(`V1 request returned status ${response.status}. Trying V1beta fallback...`);
         }
-    } catch (e) {
-        console.warn("V1 request failed due to network. Trying V1beta fallback...", e);
     }
 
-    // Try V1beta (Beta API Version) as fallback
-    const urlV1beta = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await fetch(urlV1beta, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyObj)
-    });
-
-    if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!textResponse) {
-        throw new Error("Invalid or empty response from Gemini API.");
-    }
-    return JSON.parse(textResponse.trim());
+    throw lastError || new Error("Failed to connect to Gemini API. Please check your API key or connection.");
 }
