@@ -283,10 +283,17 @@ const DEFAULT_USERS = {
             }
         ]
     },
+    "faculty": {
+        role: "faculty",
+        password: "faculty123",
+        name: "Professor Sharma",
+        history: []
+    },
     "admin": {
         role: "admin",
         password: "admin123",
-        name: "Professor Abhi"
+        name: "System Admin",
+        history: []
     }
 };
 
@@ -303,12 +310,12 @@ const DEFAULT_PROCTOR_LOGS = [
 
 // Initialize Storage
 export function initDB() {
-    if (!localStorage.getItem("testabhi_initialized_v3")) {
+    if (!localStorage.getItem("testabhi_initialized_v4")) {
         localStorage.setItem("testabhi_tests", JSON.stringify(DEFAULT_TESTS));
         localStorage.setItem("testabhi_users", JSON.stringify(DEFAULT_USERS));
         localStorage.setItem("testabhi_proctor_logs", JSON.stringify(DEFAULT_PROCTOR_LOGS));
         localStorage.setItem("testabhi_initialized", "true");
-        localStorage.setItem("testabhi_initialized_v3", "true");
+        localStorage.setItem("testabhi_initialized_v4", "true");
     }
 }
 
@@ -362,4 +369,40 @@ export function saveTestAttempt(username, attempt) {
         return true;
     }
     return false;
+}
+
+export function registerUser(username, password, name, role) {
+    const users = getUsers();
+    const cleanUsername = username.toLowerCase().trim();
+    
+    if (cleanUsername === 'admin' || role === 'admin') {
+        return { success: false, message: "Cannot register a new Administrator account." };
+    }
+    
+    if (users[cleanUsername]) {
+        return { success: false, message: "Username already exists." };
+    }
+    
+    users[cleanUsername] = {
+        role: role,
+        password: password,
+        name: name.trim(),
+        history: []
+    };
+    
+    saveUsers(users);
+    return { success: true, message: "Registration successful!" };
+}
+
+export function updateUserProfile(username, newName, newPassword) {
+    const users = getUsers();
+    const cleanUsername = username.toLowerCase().trim();
+    
+    if (users[cleanUsername]) {
+        if (newName) users[cleanUsername].name = newName.trim();
+        if (newPassword) users[cleanUsername].password = newPassword;
+        saveUsers(users);
+        return { success: true, message: "Profile updated successfully!" };
+    }
+    return { success: false, message: "User not found." };
 }

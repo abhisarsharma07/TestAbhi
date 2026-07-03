@@ -4,6 +4,7 @@
 
 import { getTests, saveTests, getProctorLogs } from '../db.js';
 import { formatDate, showToast } from '../utils.js';
+import { navigate } from '../app.js';
 
 export function renderAdminDashboard(user) {
     const container = document.createElement("div");
@@ -56,6 +57,11 @@ export function renderAdminDashboard(user) {
             <button class="admin-tab-btn" data-tab="monitor">
                 <i class="fas fa-video"></i> Live Monitor logs
             </button>
+            ${user.role === 'admin' ? `
+                <button class="admin-tab-btn" id="user-mgmt-tab-btn" style="margin-left: auto; color: hsl(263, 90%, 65%); border-color: rgba(139, 92, 246, 0.3);">
+                    <i class="fas fa-users-cog"></i> User Management
+                </button>
+            ` : ''}
         </div>
 
         <!-- Tab content wrappers -->
@@ -1389,6 +1395,14 @@ export function renderAdminDashboard(user) {
             switchTab(btn.getAttribute("data-tab"));
         });
     });
+
+    // User management button (Admin only) → routes to Super Admin panel
+    const userMgmtBtn = container.querySelector("#user-mgmt-tab-btn");
+    if (userMgmtBtn) {
+        userMgmtBtn.addEventListener("click", () => {
+            navigate('super-admin');
+        });
+    }
 
     // Initial load
     renderAnalytics();

@@ -16,8 +16,8 @@ export function renderHeader(user, onLogout, toggleTheme) {
         </div>
         <div class="nav-right">
             ${user ? `
-                <div class="user-info-badge">
-                    <i class="fas ${user.role === 'admin' ? 'fa-user-shield' : 'fa-user-graduate'}"></i>
+                <div class="user-info-badge" id="nav-profile-badge" style="cursor: pointer;" title="View Profile">
+                    <i class="fas ${user.role === 'admin' ? 'fa-user-shield' : (user.role === 'faculty' ? 'fa-user-tie' : 'fa-user-graduate')}"></i>
                     <span>${user.name} (${user.role})</span>
                 </div>
             ` : ''}
@@ -55,6 +55,13 @@ export function renderHeader(user, onLogout, toggleTheme) {
     });
 
     if (user) {
+        const profileBadge = header.querySelector("#nav-profile-badge");
+        if (profileBadge) {
+            profileBadge.addEventListener("click", () => {
+                navigate('profile');
+            });
+        }
+
         const logoutBtn = header.querySelector("#logout-btn");
         logoutBtn.addEventListener("click", () => {
             onLogout();

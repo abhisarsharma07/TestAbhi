@@ -9,11 +9,14 @@ import { renderStudentDashboard } from './views/studentDashboard.js';
 import { renderTestInterface } from './views/testInterface.js';
 import { renderTestResults } from './views/testResults.js';
 import { renderAdminDashboard } from './views/adminDashboard.js';
+import { renderProfileView } from './views/profile.js';
+import { renderSuperAdminDashboard } from './views/superAdmin.js';
+import { renderFacultyDashboard } from './views/facultyDashboard.js';
 import { showToast } from './utils.js';
 
 // Application state variables
 let currentUser = null;
-let currentPage = 'auth'; // 'auth', 'student', 'admin', 'test-taking', 'results'
+let currentPage = 'auth'; // 'auth', 'student', 'faculty', 'admin', 'super-admin', 'test-taking', 'results', 'profile'
 let activeParams = null; // Arguments to pass to views
 
 // Initial initialization
@@ -28,10 +31,16 @@ function initApp() {
     const sessionUser = sessionStorage.getItem("testabhi_session");
     if (sessionUser) {
         currentUser = JSON.parse(sessionUser);
-        currentPage = currentUser.role === 'admin' ? 'admin' : 'student';
+        currentPage = getDefaultPage(currentUser.role);
     }
 
     render();
+}
+
+function getDefaultPage(role) {
+    if (role === 'admin') return 'super-admin';
+    if (role === 'faculty') return 'faculty';
+    return 'student';
 }
 
 // Router trigger function
@@ -97,13 +106,37 @@ function render() {
                 }
             );
             break;
+
+        case 'faculty':
+            if (!currentUser || currentUser.role !== 'faculty') {
+                navigate('auth');
+                return;
+            }
+            viewNode = renderFacultyDashboard(currentUser);
+            break;
             
         case 'admin':
-            if (!currentUser || currentUser.role !== 'admin') {
+            if (!currentUser || (currentUser.role !== 'admin' && currentUser.role !== 'faculty')) {
                 navigate('auth');
                 return;
             }
             viewNode = renderAdminDashboard(currentUser);
+            break;
+
+        case 'super-admin':
+            if (!currentUser || currentUser.role !== 'admin') {
+                navigate('auth');
+                return;
+            }
+            viewNode = renderSuperAdminDashboard(currentUser);
+            break;
+
+        case 'profile':
+            if (!currentUser) {
+                navigate('auth');
+                return;
+            }
+            viewNode = renderProfileView(currentUser);
             break;
             
         case 'test-taking':
@@ -134,11 +167,7 @@ function render() {
             viewNode = renderTestResults(
                 attempt,
                 () => {
-                    if (currentUser.role === 'admin') {
-                        navigate('admin');
-                    } else {
-                        navigate('student');
-                    }
+                    navigate(getDefaultPage(currentUser.role));
                 }
             );
             break;
@@ -156,11 +185,7 @@ function render() {
 function handleLoginSuccess(user) {
     currentUser = user;
     sessionStorage.setItem("testabhi_session", JSON.stringify(user));
-    if (user.role === 'admin') {
-        navigate('admin');
-    } else {
-        navigate('student');
-    }
+    navigate(getDefaultPage(user.role));
 }
 
 function handleLogout() {
@@ -172,3 +197,4 @@ function handleLogout() {
 
 // Start Application on Page Load
 document.addEventListener("DOMContentLoaded", initApp);
+
