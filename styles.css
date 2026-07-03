@@ -320,6 +320,128 @@ h1, h2, h3, h4, h5, h6 {
     min-height: calc(100vh - 80px);
     padding: 2rem;
     position: relative;
+    gap: 3rem;
+    flex-wrap: wrap;
+}
+
+.dev-card {
+    background-color: var(--bg-card);
+    border: var(--glass-border);
+    backdrop-filter: var(--glass-backdrop);
+    border-radius: var(--border-radius-lg);
+    padding: 3rem 2.5rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.dev-card:hover {
+    border-color: hsl(239, 84%, 57%);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(99, 102, 241, 0.15);
+}
+
+.dev-badge {
+    background: rgba(99, 102, 241, 0.1);
+    color: hsl(239, 84%, 70%);
+    border: 1px solid rgba(99, 102, 241, 0.25);
+    padding: 0.35rem 0.85rem;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 1.25rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dev-name {
+    font-size: 2.1rem;
+    font-family: var(--font-heading);
+    font-weight: 800;
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+}
+
+.dev-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.25rem;
+}
+
+.dev-college {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.dev-socials {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    width: 100%;
+}
+
+.dev-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1.25rem;
+    border-radius: var(--border-radius-sm);
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: white;
+    transition: all var(--transition-fast);
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.dev-btn i {
+    font-size: 1.1rem;
+}
+
+.dev-btn.linkedin {
+    background: #0077b5;
+}
+.dev-btn.linkedin:hover {
+    background: #006396;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(0, 119, 181, 0.3);
+}
+
+.dev-btn.github {
+    background: #24292e;
+}
+.dev-btn.github:hover {
+    background: #171a1d;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(36, 41, 46, 0.3);
+}
+
+.dev-btn.instagram {
+    background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+}
+.dev-btn.instagram:hover {
+    opacity: 0.95;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 15px rgba(220, 39, 67, 0.3);
 }
 
 .auth-wrapper::before {

@@ -41,6 +41,24 @@ export function renderAuthView(onLoginSuccess) {
                         </p>
                     </div>
                 </div>
+
+                <div class="dev-card">
+                    <span class="dev-badge"><i class="fas fa-code"></i> Lead Developer</span>
+                    <h2 class="dev-name">Abhisar Sharma</h2>
+                    <p class="dev-title">B.Tech Graduate 2026</p>
+                    <p class="dev-college"><i class="fas fa-graduation-cap"></i> JECRC College, Jaipur</p>
+                    <div class="dev-socials">
+                        <a href="https://www.linkedin.com/in/abhisarsharma07" target="_blank" class="dev-btn linkedin">
+                            <i class="fab fa-linkedin-in"></i> LinkedIn
+                        </a>
+                        <a href="https://github.com/abhisarsharma07" target="_blank" class="dev-btn github">
+                            <i class="fab fa-github"></i> GitHub
+                        </a>
+                        <a href="https://www.instagram.com/cursedwarrior16/" target="_blank" class="dev-btn instagram">
+                            <i class="fab fa-instagram"></i> Instagram
+                        </a>
+                    </div>
+                </div>
             `;
             
             const form = container.querySelector("#login-form");
@@ -126,6 +144,24 @@ export function renderAuthView(onLoginSuccess) {
                             Already have an account? 
                             <a href="#" id="go-to-login" style="color: hsl(239, 84%, 67%); font-weight: 600; text-decoration: none; margin-left: 0.25rem;">Sign In</a>
                         </p>
+                    </div>
+                </div>
+
+                <div class="dev-card">
+                    <span class="dev-badge"><i class="fas fa-code"></i> Lead Developer</span>
+                    <h2 class="dev-name">Abhisar Sharma</h2>
+                    <p class="dev-title">B.Tech Graduate 2026</p>
+                    <p class="dev-college"><i class="fas fa-graduation-cap"></i> JECRC College, Jaipur</p>
+                    <div class="dev-socials">
+                        <a href="https://www.linkedin.com/in/abhisarsharma07" target="_blank" class="dev-btn linkedin">
+                            <i class="fab fa-linkedin-in"></i> LinkedIn
+                        </a>
+                        <a href="https://github.com/abhisarsharma07" target="_blank" class="dev-btn github">
+                            <i class="fab fa-github"></i> GitHub
+                        </a>
+                        <a href="https://www.instagram.com/cursedwarrior16/" target="_blank" class="dev-btn instagram">
+                            <i class="fab fa-instagram"></i> Instagram
+                        </a>
                     </div>
                 </div>
             `;
