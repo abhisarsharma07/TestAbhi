@@ -452,39 +452,34 @@ export function renderAdminDashboard(user) {
                 let reply = '';
                 const lower = userText.toLowerCase();
 
-                // High-priority check: does input look like a raw copy-pasted question list?
-                const hasAnswers = lower.includes("correct answer:") || lower.includes("correct answer") || lower.includes("ans:");
-                const hasOptions = (lower.includes("a)") && lower.includes("b)")) || (lower.includes("a.") && lower.includes("b."));
-                
-                if (hasAnswers && hasOptions) {
-                    const parsed = parseRawQuestions(userText);
-                    if (parsed.questions.length > 0) {
-                        proposedQuestionsList = parsed.questions;
-                        proposedSectionsList = parsed.sections;
-                        chatTopic = "Custom Trivia Quiz";
-                        chatCount = parsed.questions.length;
-                        chatPhase = 2; // Finalized state ready to load
-                        
-                        let reply = `I detected a list of raw questions! I have successfully parsed **${parsed.questions.length}** questions${parsed.sections.length > 0 ? ` across **${parsed.sections.length}** sections` : ''} from your copy-pasted text.\n\n`;
-                        
-                        if (parsed.sections.length > 0) {
-                            reply += `**Parsed Sections:**\n` + 
-                                parsed.sections.map(s => `- **${s.name}**: ${s.duration} minutes (${parsed.questions.filter(q => q.sectionName === s.name).length} questions)`).join('\n') + `\n\n`;
-                        }
-                        
-                        reply += `**Questions Structured:**\n` +
-                            parsed.questions.map((q, idx) => {
-                                const ansLabel = q.type === 'multi' 
-                                    ? q.answers.map(a => String.fromCharCode(65 + a)).join(', ') 
-                                    : String.fromCharCode(65 + q.answer);
-                                return `${idx + 1}. [${q.type.toUpperCase()}] ${q.text} (Section: *${q.sectionName}*, Answer: ${ansLabel})`;
-                            }).join('\n') +
-                            `\n\nClick the **Load Proposed Questions into Editor** button below to sync them to the Verification Panel so you can manually check and publish the assessment!`;
-                        
-                        chatHistory.push({ sender: 'agent', text: reply });
-                        renderChatMessages();
-                        return;
+                // High-priority check: Try parsing the copy-pasted input directly. If it yields valid questions, use them!
+                const parsed = parseRawQuestions(userText);
+                if (parsed.questions.length > 0) {
+                    proposedQuestionsList = parsed.questions;
+                    proposedSectionsList = parsed.sections;
+                    chatTopic = "Custom Pasted Assessment";
+                    chatCount = parsed.questions.length;
+                    chatPhase = 2; // Finalized state ready to load
+                    
+                    let reply = `I detected a list of raw questions! I have successfully parsed **${parsed.questions.length}** questions${parsed.sections.length > 0 ? ` across **${parsed.sections.length}** sections` : ''} from your copy-pasted text.\n\n`;
+                    
+                    if (parsed.sections.length > 0) {
+                        reply += `**Parsed Sections:**\n` + 
+                            parsed.sections.map(s => `- **${s.name}**: ${s.duration} minutes (${parsed.questions.filter(q => q.sectionName === s.name).length} questions)`).join('\n') + `\n\n`;
                     }
+                    
+                    reply += `**Questions Structured:**\n` +
+                        parsed.questions.map((q, idx) => {
+                            const ansLabel = q.type === 'multi' 
+                                ? (q.answers || []).map(a => String.fromCharCode(65 + a)).join(', ') 
+                                : (typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : q.answer);
+                            return `${idx + 1}. [${q.type.toUpperCase()}] ${q.text} (Section: *${q.sectionName}*, Answer: ${ansLabel})`;
+                        }).join('\n') +
+                        `\n\nClick the **Load Proposed Questions into Editor** button below to sync them to the Verification Panel so you can manually check and publish the assessment!`;
+                    
+                    chatHistory.push({ sender: 'agent', text: reply });
+                    renderChatMessages();
+                    return;
                 }
 
                 if (chatPhase === 0) {
@@ -570,34 +565,56 @@ export function renderAdminDashboard(user) {
             showToast("Conversation reset.", "info");
         });
 
-        // Sync drafts to manual verification editor
+        // Sync drafts to manual verification editor (merging/appending questions & sections)
         loadDraftsBtn.addEventListener("click", (e) => {
             e.preventDefault();
             if (proposedQuestionsList.length === 0) return;
 
-            // Fill text fields
-            paneBuilder.querySelector("#test-title").value = `${chatTopic.charAt(0).toUpperCase() + chatTopic.slice(1)} Test`;
-            paneBuilder.querySelector("#test-desc").value = `AI Conversational Draft covering ${chatTopic} metrics.`;
+            // Fill text fields if currently blank
+            const titleEl = paneBuilder.querySelector("#test-title");
+            const descEl = paneBuilder.querySelector("#test-desc");
+            if (!titleEl.value.trim()) {
+                titleEl.value = `${chatTopic.charAt(0).toUpperCase() + chatTopic.slice(1)} Test`;
+            }
+            if (!descEl.value.trim()) {
+                descEl.value = `AI Conversational Draft covering ${chatTopic} metrics.`;
+            }
 
-            // Load sections
-            builderSections = proposedSectionsList.length > 0 
-                ? [...proposedSectionsList] 
-                : [{ name: 'General', duration: 15 }];
+            // Load & Merge sections
+            if (proposedSectionsList.length > 0) {
+                proposedSectionsList.forEach(pSec => {
+                    if (!builderSections.some(s => s.name.toLowerCase() === pSec.name.toLowerCase())) {
+                        builderSections.push(pSec);
+                    }
+                });
+            } else {
+                if (builderSections.length === 0) {
+                    builderSections.push({ name: 'General', duration: 15 });
+                }
+            }
                 
-            // Check the "Enable Section-Wise Timing" checkbox if multiple sections were parsed!
-            const checkSectionTiming = proposedSectionsList.length > 1;
+            // Check the "Enable Section-Wise Timing" checkbox if multiple sections exist
             const timingCheckbox = paneBuilder.querySelector("#test-section-wise-timing");
             const managerWrapper = paneBuilder.querySelector("#builder-sections-manager-wrapper");
             
-            timingCheckbox.checked = checkSectionTiming;
-            if (checkSectionTiming) {
+            const hasMultipleSections = builderSections.length > 1;
+            timingCheckbox.checked = hasMultipleSections;
+            if (hasMultipleSections) {
                 managerWrapper.style.display = "block";
             } else {
                 managerWrapper.style.display = "none";
             }
 
-            // Load questions
-            builderQuestions = [...proposedQuestionsList];
+            // Append questions (remove the default initial empty question card if present)
+            const isInitialEmpty = builderQuestions.length === 1 && 
+                                   !builderQuestions[0].text && 
+                                   builderQuestions[0].options.every(o => !o);
+            
+            if (isInitialEmpty) {
+                builderQuestions = [...proposedQuestionsList];
+            } else {
+                builderQuestions = [...builderQuestions, ...proposedQuestionsList];
+            }
             
             renderBuilderSections();
             renderBuilderQuestions();
@@ -643,11 +660,11 @@ export function renderAdminDashboard(user) {
         msgBox.scrollTop = msgBox.scrollHeight;
     }
 
-    // Helper: Parse raw copy-pasted questions text block
+    // Helper: Parse raw copy-pasted questions text block with intelligent chunking and regex heuristics
     function parseRawQuestions(text) {
         const questions = [];
         const sectionsParsed = [];
-        
+
         // Scan text for section titles chronologically
         const sectionHeaderRegex = /(?:Part|Section)\s+([A-Z0-9]+)\s*:\s*([^\r\n\(\:]+)/gi;
         const sectionMatches = [...text.matchAll(sectionHeaderRegex)];
@@ -656,99 +673,196 @@ export function renderAdminDashboard(user) {
             sectionsParsed.push({
                 name: sm[2].trim(),
                 startIndex: sm.index,
-                duration: 5 // default
+                duration: 5
             });
         });
-        
-        // Match: Question Body, Option A, Option B, Option C, Option D, Correct Answer Letter(s)
-        const globalMcqRegex = /([\s\S]+?)\s*[A]\s*[\.\)]\s*([\s\S]+?)\s*[B]\s*[\.\)]\s*([\s\S]+?)\s*[C]\s*[\.\)]\s*([\s\S]+?)\s*[D]\s*[\.\)]\s*([\s\S]+?)\s*(?:Correct Answer|Answer|Ans):\s*([A-D](?:\s*,\s*[A-D])*)/gi;
-        
-        const globalMatches = [...text.matchAll(globalMcqRegex)];
-        
-        if (globalMatches.length > 0) {
-            globalMatches.forEach(m => {
-                let qText = m[1].trim();
-                const qIndex = m.index;
-                
-                // Find matching parsed section
-                let assignedSection = null;
-                for (let s = sectionsParsed.length - 1; s >= 0; s--) {
-                    if (qIndex >= sectionsParsed[s].startIndex) {
-                        assignedSection = sectionsParsed[s];
-                        break;
+
+        // Split text into lines to separate question blocks
+        const lines = text.split(/\r?\n/);
+        const blocks = [];
+        let currentBlock = [];
+
+        const isNewQuestionStart = (line) => {
+            const trimmed = line.trim();
+            // Match e.g. "1.", "Q1:", "Question 2)", "10 -"
+            if (/^\s*(?:Q|Question\s*)?\d+\s*[\.\)\:\-\u2013\u2014]/i.test(trimmed)) {
+                return true;
+            }
+            // Match brackets or parentheses e.g. "[2]", "(3)"
+            if (/^\s*[\[\(]\d+[\]\)]/i.test(trimmed)) {
+                return true;
+            }
+            return false;
+        };
+
+        const isSectionStart = (line) => {
+            return /^\s*(?:Part|Section)\s+[A-Z0-9]+/i.test(line);
+        };
+
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+
+            if (isNewQuestionStart(line) || isSectionStart(line)) {
+                if (currentBlock.length > 0) {
+                    blocks.push(currentBlock.join('\n'));
+                }
+                currentBlock = [line];
+            } else {
+                currentBlock.push(line);
+            }
+        });
+        if (currentBlock.length > 0) {
+            blocks.push(currentBlock.join('\n'));
+        }
+
+        blocks.forEach((blockText) => {
+            if (isSectionStart(blockText)) return;
+
+            const qIndex = text.indexOf(blockText);
+            let assignedSection = null;
+            for (let s = sectionsParsed.length - 1; s >= 0; s--) {
+                if (qIndex >= sectionsParsed[s].startIndex) {
+                    assignedSection = sectionsParsed[s];
+                    break;
+                }
+            }
+            const secName = assignedSection ? assignedSection.name : 'General';
+
+            const blockLines = blockText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+            if (blockLines.length === 0) return;
+
+            let questionBody = '';
+            const options = [];
+            const correctOptionIndexes = [];
+            let explanation = '';
+            let parsingOptions = false;
+
+            // Robust checks for different option letter indicators (A. or A) or a. or a))
+            const optionPrefixRegex = /^\s*([A-Ea-e])\s*[\.\)\-\:\u2013\u2014]\s*(.+)$/;
+            const answerRegex = /(?:Correct\s*Answer|Answer|Ans|Key|Correct\s*Option)\s*[\:\-\=]?\s*([A-Ea-e\s\,]+)/i;
+            const explanationRegex = /(?:Explanation|Exp|Reason)\s*[\:\-\=]?\s*(.+)$/i;
+
+            blockLines.forEach(line => {
+                const optMatch = line.match(optionPrefixRegex);
+                const ansMatch = line.match(answerRegex);
+                const expMatch = line.match(explanationRegex);
+
+                if (expMatch) {
+                    explanation = expMatch[1].trim();
+                } else if (ansMatch) {
+                    const rawAns = ansMatch[1].toUpperCase().replace(/[^A-E]/g, '');
+                    for (let c of rawAns) {
+                        const idx = c.charCodeAt(0) - 65;
+                        if (idx >= 0 && idx < 5 && !correctOptionIndexes.includes(idx)) {
+                            correctOptionIndexes.push(idx);
+                        }
+                    }
+                } else if (optMatch) {
+                    parsingOptions = true;
+                    let optText = optMatch[2].trim();
+                    const letter = optMatch[1].toUpperCase();
+                    const isMarkedCorrect = optText.toLowerCase().includes('(correct)') || optText.endsWith('*') || line.startsWith('*');
+                    
+                    optText = optText.replace(/\(correct\)/gi, '').replace(/\*$/, '').trim();
+                    options.push(optText);
+
+                    if (isMarkedCorrect) {
+                        const idx = letter.charCodeAt(0) - 65;
+                        if (!correctOptionIndexes.includes(idx)) {
+                            correctOptionIndexes.push(idx);
+                        }
+                    }
+                } else {
+                    if (!parsingOptions) {
+                        if (questionBody) questionBody += ' ';
+                        questionBody += line;
+                    } else {
+                        // Append multi-line option text
+                        if (options.length > 0) {
+                            options[options.length - 1] += ' ' + line;
+                        }
                     }
                 }
-                
-                const secName = assignedSection ? assignedSection.name : 'General';
-                
-                // 1. Strip section titles or headers (e.g. "Part B: Single Correct Answer...")
-                qText = qText.replace(/Part\s+[A-Z]\s*:\s*[\s\S]+?(?=\d+\s*[\.\)]|$)/i, "").trim();
-                
-                // 2. Strip any introductory text before the first question number
-                qText = qText.replace(/^[\s\S]+?(?=\b\d+\s*[\.\)])/i, "").trim();
-                
-                // 3. Clean leading numbers if any (e.g. "1. ", "10) ")
-                qText = qText.replace(/^\s*\d+\s*[\.\)]\s*/, "").trim();
-                
-                // 4. Clean up previous answer leaks or orphaned symbols
-                if (questions.length > 0) {
-                    qText = qText.replace(/^\s*[\s\.,\)\(A-D]*\)?\s*/i, "").trim();
+            });
+
+            // Strip leading numbering tags from the body
+            questionBody = questionBody
+                .replace(/^\s*(?:Q|Question\s*)?\d+\s*[\.\)\:\-\u2013\u2014]\s*/i, '')
+                .replace(/^\s*[\[\(]\d+[\]\)]\s*/, '')
+                .trim();
+
+            if (!questionBody) return;
+
+            if (options.length >= 2) {
+                // Check if we still have no correct answer index
+                if (correctOptionIndexes.length === 0) {
+                    const fallbackMatch = blockText.match(/(?:Correct\s*Answer|Answer|Ans|Key|Correct\s*Option)\s*[\:\-\=]?\s*([A-E])/i);
+                    if (fallbackMatch) {
+                        const idx = fallbackMatch[1].toUpperCase().charCodeAt(0) - 65;
+                        correctOptionIndexes.push(idx);
+                    }
                 }
-                
-                const rawOptions = [m[2], m[3], m[4], m[5]];
-                const cleanedOptions = rawOptions.map(opt => {
-                    // Strip trailing answer declarations if regex matched too lazily
-                    return opt.split(/Correct Answer/i)[0].split(/Answer/i)[0].trim().replace(/\s+/g, ' ');
-                });
-                
-                // Parse Correct Answer(s)
-                const rawAnsStr = m[6].toUpperCase();
-                const letters = rawAnsStr.split(',').map(l => l.trim());
-                
-                const isMulti = letters.length > 1;
-                
+
+                const isMulti = correctOptionIndexes.length > 1;
                 if (isMulti) {
-                    const answersIdxs = letters.map(l => l.charCodeAt(0) - 65);
                     questions.push({
                         id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                        text: qText,
+                        text: questionBody,
                         type: 'multi',
-                        options: cleanedOptions,
-                        answers: answersIdxs,
+                        options: options,
+                        answers: correctOptionIndexes,
                         sectionName: secName,
                         sectionDuration: 5,
-                        explanation: "Parsed dynamically from chat copy-paste (Multiple Response)."
+                        explanation: explanation || "Parsed dynamically (Multiple Response MCQ)."
                     });
                 } else {
-                    const answerIdx = letters[0].charCodeAt(0) - 65;
+                    const ans = correctOptionIndexes.length > 0 ? correctOptionIndexes[0] : 0;
                     questions.push({
                         id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                        text: qText,
+                        text: questionBody,
                         type: 'single',
-                        options: cleanedOptions,
-                        answer: answerIdx,
+                        options: options,
+                        answer: ans,
                         sectionName: secName,
                         sectionDuration: 5,
-                        explanation: "Parsed dynamically from chat copy-paste (Single Choice)."
+                        explanation: explanation || "Parsed dynamically (Single Choice MCQ)."
                     });
                 }
-            });
-        }
-        
-        // Auto compute durations based on assigned questions count
+            } else {
+                // Text Entry fallback
+                let textAnswer = '';
+                const textAnsMatch = blockText.match(/(?:Correct\s*Answer|Answer|Ans|Key)\s*[\:\-\=]?\s*(.+)$/im);
+                if (textAnsMatch) {
+                    textAnswer = textAnsMatch[1].trim();
+                }
+
+                questions.push({
+                    id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                    text: questionBody,
+                    type: 'text',
+                    options: ['', ''],
+                    answer: textAnswer,
+                    sectionName: secName,
+                    sectionDuration: 5,
+                    explanation: explanation || "Parsed dynamically (Short Text Entry)."
+                });
+            }
+        });
+
+        // Compute sections duration
         sectionsParsed.forEach(sec => {
             const count = questions.filter(q => q.sectionName === sec.name).length;
-            sec.duration = Math.max(2, count * 2); // 2 minutes per question, minimum of 2 minutes
+            sec.duration = Math.max(2, count * 2);
         });
-        
-        // Update sectionDuration variables on questions matching each section
+
         questions.forEach(q => {
             const matchedSec = sectionsParsed.find(s => s.name === q.sectionName);
             if (matchedSec) {
                 q.sectionDuration = matchedSec.duration;
             }
         });
-        
+
         return {
             questions,
             sections: sectionsParsed
