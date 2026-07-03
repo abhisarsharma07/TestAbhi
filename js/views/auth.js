@@ -15,7 +15,7 @@ export function renderAuthView(onLoginSuccess) {
         if (viewMode === 'login') {
             container.innerHTML = `
                 <div class="auth-card">
-                    <h1 class="auth-logo"><i class="fas fa-graduation-cap"></i> TestAbhi</h1>
+                    <h1 class="auth-logo"><img src="assets/logo.png" alt="TestAbhi Logo" class="auth-logo-img"> TestAbhi</h1>
                     <p class="auth-sub">Assessments made secure, smart, and beautiful.</p>
                     
                     <form class="auth-form" id="login-form">
@@ -85,7 +85,7 @@ export function renderAuthView(onLoginSuccess) {
         } else {
             container.innerHTML = `
                 <div class="auth-card">
-                    <h1 class="auth-logo"><i class="fas fa-graduation-cap"></i> TestAbhi</h1>
+                    <h1 class="auth-logo"><img src="assets/logo.png" alt="TestAbhi Logo" class="auth-logo-img"> TestAbhi</h1>
                     <p class="auth-sub">Create your account to get started.</p>
                     
                     <form class="auth-form" id="register-form">

@@ -11,7 +11,7 @@ export function renderHeader(user, onLogout, toggleTheme) {
 
     header.innerHTML = `
         <div class="brand" id="nav-brand">
-            <i class="fas fa-graduation-cap"></i>
+            <img src="assets/logo.png" alt="TestAbhi Logo" class="brand-logo">
             <span>TestAbhi</span>
         </div>
         <div class="nav-right">
