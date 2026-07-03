@@ -59,6 +59,10 @@ export function renderAuthView(onLoginSuccess) {
                         </a>
                     </div>
                 </div>
+
+                <button class="dev-toggle-btn" id="dev-toggle-btn" title="Developer Details">
+                    <i class="fas fa-code"></i>
+                </button>
             `;
             
             const form = container.querySelector("#login-form");
@@ -164,6 +168,10 @@ export function renderAuthView(onLoginSuccess) {
                         </a>
                     </div>
                 </div>
+
+                <button class="dev-toggle-btn" id="dev-toggle-btn" title="Developer Details">
+                    <i class="fas fa-code"></i>
+                </button>
             `;
             
             const form = container.querySelector("#register-form");
@@ -219,8 +227,36 @@ export function renderAuthView(onLoginSuccess) {
                 renderContent();
             });
         }
+
+        // Initialize toggle listeners
+        setupDevToggle(container);
     };
 
     renderContent();
     return container;
+}
+
+// -------------------------------------------------------------
+// Helper to manage developer profile toggle & click-outside close
+// -------------------------------------------------------------
+function setupDevToggle(container) {
+    const toggleBtn = container.querySelector("#dev-toggle-btn");
+    const devCard = container.querySelector(".dev-card");
+    if (toggleBtn && devCard) {
+        toggleBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            devCard.classList.toggle("show");
+            toggleBtn.classList.toggle("active");
+        });
+
+        devCard.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+
+        // Close when clicking anywhere else on screen
+        document.addEventListener("click", () => {
+            devCard.classList.remove("show");
+            toggleBtn.classList.remove("active");
+        });
+    }
 }

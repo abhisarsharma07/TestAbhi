@@ -320,8 +320,6 @@ h1, h2, h3, h4, h5, h6 {
     min-height: calc(100vh - 80px);
     padding: 2rem;
     position: relative;
-    gap: 3rem;
-    flex-wrap: wrap;
 }
 
 .dev-card {
@@ -329,22 +327,32 @@ h1, h2, h3, h4, h5, h6 {
     border: var(--glass-border);
     backdrop-filter: var(--glass-backdrop);
     border-radius: var(--border-radius-lg);
-    padding: 3rem 2.5rem;
+    padding: 2.5rem 2rem;
     width: 100%;
-    max-width: 420px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
-    z-index: 1;
+    max-width: 380px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 999;
     display: flex;
     flex-direction: column;
     align-items: center;
     text-align: center;
-    transition: transform var(--transition-fast), border-color var(--transition-fast);
+    position: fixed;
+    bottom: 6.5rem;
+    right: 2rem;
+    transform: translateY(20px);
+    opacity: 0;
+    pointer-events: none;
+    transition: transform var(--transition-smooth), opacity var(--transition-smooth), border-color var(--transition-fast);
+}
+
+.dev-card.show {
+    transform: translateY(0);
+    opacity: 1;
+    pointer-events: all;
 }
 
 .dev-card:hover {
     border-color: hsl(239, 84%, 57%);
-    transform: translateY(-4px);
-    box-shadow: 0 12px 30px rgba(99, 102, 241, 0.15);
 }
 
 .dev-badge {
@@ -442,6 +450,38 @@ h1, h2, h3, h4, h5, h6 {
     opacity: 0.95;
     transform: translateY(-2px);
     box-shadow: 0 6px 15px rgba(220, 39, 67, 0.3);
+}
+
+/* Floating Developer Card Toggle Button */
+.dev-toggle-btn {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--primary-gradient);
+    color: white;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35);
+    z-index: 1000;
+    transition: all var(--transition-smooth);
+}
+
+.dev-toggle-btn:hover {
+    transform: scale(1.1) rotate(15deg);
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.5);
+}
+
+.dev-toggle-btn.active {
+    background: var(--danger-gradient);
+    transform: rotate(135deg);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35);
 }
 
 .auth-wrapper::before {
