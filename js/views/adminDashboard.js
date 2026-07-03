@@ -91,7 +91,7 @@ export function renderAdminDashboard(user) {
         const highSeverityLogs = logs.filter(l => l.severity === 'high').length;
 
         paneAnalytics.innerHTML = `
-            <div class="dashboard-grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="dashboard-stats-grid">
                 <div class="stat-item">
                     <div class="stat-icon"><i class="fas fa-file-alt"></i></div>
                     <div class="stat-details">
@@ -284,7 +284,7 @@ export function renderAdminDashboard(user) {
             <div class="sidebar-panel" style="background-color: var(--bg-card); display: flex; flex-direction: column; gap: 1.5rem; width: 100%;">
                 <h3 class="section-title" style="margin-bottom: 0.5rem;"><i class="fas fa-edit"></i> Verification Panel & Configure Exam</h3>
                 
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 1.5rem; width: 100%;">
+                <div class="creator-config-grid">
                     <div class="input-group" style="margin-bottom: 0;">
                         <label for="test-title">Test Title</label>
                         <input type="text" id="test-title" class="input-control" placeholder="e.g. Advanced Python Concepts">
@@ -925,7 +925,7 @@ export function renderAdminDashboard(user) {
                     <input type="text" class="input-control q-text-input" data-index="${qIdx}" value="${q.text}" placeholder="What is the output of 2 + 2?" required>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+                <div class="question-config-grid">
                     <div class="input-group">
                         <label>Question Format</label>
                         <select class="input-control q-type-select" data-index="${qIdx}" style="cursor: pointer;">

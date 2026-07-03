@@ -20,7 +20,7 @@ export function renderProfileView(user) {
             : 0;
 
         statsHtml = `
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; width: 100%; margin-top: 1rem;">
+            <div class="profile-stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" style="color: hsl(190, 90%, 50%);">${taken.length}</div>
                     <div class="stat-label">Exams Taken</div>
@@ -34,7 +34,7 @@ export function renderProfileView(user) {
     } else if (user.role === 'faculty') {
         roleDescription = "Academic Faculty Member";
         statsHtml = `
-            <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; width: 100%; margin-top: 1rem;">
+            <div class="profile-stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" style="color: hsl(263, 90%, 65%);">${tests.length}</div>
                     <div class="stat-label">Total Test Bank Collections</div>
@@ -44,7 +44,7 @@ export function renderProfileView(user) {
     } else {
         roleDescription = "System Super Administrator";
         statsHtml = `
-            <div id="admin-profile-stats" style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; width: 100%; margin-top: 1rem;">
+            <div id="admin-profile-stats" class="profile-stats-grid">
                 <div class="stat-card">
                     <div class="stat-value" style="color: hsl(355, 78%, 56%); font-size: 1.25rem;"><i class="fas fa-spinner fa-spin"></i></div>
                     <div class="stat-label">Loading accounts count...</div>

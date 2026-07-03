@@ -485,6 +485,51 @@ h1, h2, h3, h4, h5, h6 {
     }
 }
 
+/* Responsive Layout Utilities */
+.dashboard-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.creator-config-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 1.5rem;
+    width: 100%;
+}
+
+.question-config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.superadmin-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+@media (max-width: 768px) {
+    .dashboard-stats-grid,
+    .creator-config-grid,
+    .question-config-grid,
+    .superadmin-stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+}
+
 .section-title {
     font-size: 1.25rem;
     margin-bottom: 1.25rem;
@@ -1843,21 +1888,7 @@ body:not(.taking-test) .webcam-container {
     .sidebar-panel {
         padding: 1.5rem !important;
     }
-    
-    div[style*="grid-template-columns: 2fr 1fr 1fr"] {
-        grid-template-columns: 1fr !important;
-        gap: 1rem !important;
-    }
-    
-    div[style*="grid-template-columns: 1fr 1fr"] {
-        grid-template-columns: 1fr !important;
-        gap: 1rem !important;
-    }
-    
-    div[style*="grid-template-columns: 2fr 1fr auto"] {
-        grid-template-columns: 1fr !important;
-        gap: 0.5rem !important;
-    }
+    /* 3. Section grid and Verification Panel layout are handled by layout classes */
     
     /* 4. Test interface layout */
     .test-interface-wrapper {
@@ -1939,6 +1970,34 @@ body:not(.taking-test) .webcam-container {
     
     .chat-bubble {
         max-width: 95% !important;
+    }
+}
+
+/* 9. Extra responsive optimizations for small displays */
+@media (max-width: 600px) {
+    .user-info-badge span {
+        display: none; /* Hide name/role text to prevent header wrapping */
+    }
+    .user-info-badge {
+        padding: 0.5rem; /* Turn badge into a sleek square icon badge */
+    }
+    .app-header {
+        padding: 1rem 4%;
+    }
+    .nav-right {
+        gap: 0.75rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .auth-wrapper {
+        padding: 1rem;
+    }
+    .auth-card {
+        padding: 2rem 1.5rem;
+    }
+    .auth-logo {
+        font-size: 1.85rem !important;
     }
 }
 

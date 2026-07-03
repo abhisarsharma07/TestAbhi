@@ -37,7 +37,7 @@ export function renderSuperAdminDashboard(currentUser) {
             </div>
 
             <!-- Stats Bar -->
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
+            <div class="superadmin-stats-grid">
                 <div class="stat-card" style="border: var(--glass-border); background-color: var(--bg-card);">
                     <div class="stat-value" style="color: hsl(190, 90%, 50%);">${totalStudents}</div>
                     <div class="stat-label">Registered Students</div>
