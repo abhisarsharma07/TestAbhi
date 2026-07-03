@@ -323,11 +323,25 @@ const DEFAULT_PROCTOR_LOGS = [
     }
 ];
 
+// Promise timeout wrapper
+function withTimeout(promise, ms, errorMessage) {
+    return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(errorMessage || "Timeout")), ms))
+    ]);
+}
+
 // Initialize Storage
 export async function initDB() {
+    const timeoutMsg = "Database connection timed out. Please ensure that you have created the 'Firestore Database' in your Firebase console (Build -> Firestore Database) and set the rules to 'Test Mode'.";
+    
     // Check if Firestore has been seeded before
     const metaRef = doc(db, 'app_meta', 'config');
-    const metaSnap = await getDoc(metaRef);
+    const metaSnap = await withTimeout(
+        getDoc(metaRef), 
+        6000, 
+        timeoutMsg
+    );
 
     if (!metaSnap.exists() || !metaSnap.data().initialized) {
         // Seed default data using batch write
@@ -346,17 +360,22 @@ export async function initDB() {
         });
 
         batch.set(metaRef, { initialized: true });
-        await batch.commit();
+        await withTimeout(batch.commit(), 6000, "Failed to write seed data to Firestore.");
     }
 
     // Fast Startup: ONLY fetch tests list (which is required by the dashboard shells)
-    const testsSnap = await getDocs(collection(db, 'tests'));
+    const testsSnap = await withTimeout(
+        getDocs(collection(db, 'tests')), 
+        6000, 
+        "Failed to load assessment collections from Firestore."
+    );
     cache.tests = testsSnap.docs.map(d => d.data());
     
     // Clear user and logs cache — populated dynamically later
     cache.users = {};
     cache.proctor_logs = [];
 }
+
 
 // =======================
 // Async demand fetchers (Populates cache dynamically on-demand)

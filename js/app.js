@@ -42,21 +42,25 @@ async function initApp() {
     try {
         await initDB(); // Fetch all data from Firestore into cache
     } catch (err) {
+        console.error("Firebase connection error:", err);
         appEl.innerHTML = `
             <div style="
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
-                min-height: 100vh; gap: 1rem; text-align: center; padding: 2rem;
+                min-height: 100vh; gap: 1.25rem; text-align: center; padding: 2rem; max-width: 600px; margin: 0 auto;
             ">
-                <i class="fas fa-exclamation-triangle" style="font-size: 2.5rem; color: hsl(0, 85%, 60%);"></i>
-                <h2 style="color: var(--text-primary);">Connection Failed</h2>
-                <p style="color: var(--text-secondary);">Could not connect to the database. Please check your internet connection and try again.</p>
-                <button onclick="location.reload()" class="btn btn-primary" style="margin-top: 0.5rem;">
-                    <i class="fas fa-redo"></i> Retry
+                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: hsl(355, 78%, 56%);"></i>
+                <h2 style="color: var(--text-primary); font-family: var(--font-heading); margin-bottom: 0.25rem;">Database Connection Error</h2>
+                <p style="color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem; margin-bottom: 1rem;">
+                    ${err.message || "Failed to establish a connection with Firebase."}
+                </p>
+                <button onclick="location.reload()" class="btn btn-primary" style="padding: 0.75rem 2rem;">
+                    <i class="fas fa-redo"></i> Retry Connection
                 </button>
             </div>
         `;
         return;
     }
+
 
     // Restore login session
     const sessionUser = sessionStorage.getItem("testabhi_session");
