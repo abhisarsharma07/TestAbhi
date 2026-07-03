@@ -308,6 +308,39 @@ export function renderAdminDashboard(user) {
                     <input type="text" id="test-desc" class="input-control" placeholder="Brief outline detailing what the test covers...">
                 </div>
 
+                <!-- Schedule Window -->
+                <div style="background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); padding: 1.25rem; border-radius: 8px;">
+                    <h4 style="margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--text-primary); display: flex; align-items: center; gap: 0.5rem;">
+                        <i class="fas fa-calendar-alt" style="color: hsl(190, 90%, 50%);"></i> Schedule Window (Optional)
+                    </h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label for="test-window-start">Available From</label>
+                            <input type="datetime-local" id="test-window-start" class="input-control">
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label for="test-window-end">Expires At</label>
+                            <input type="datetime-local" id="test-window-end" class="input-control">
+                        </div>
+                    </div>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Leave blank to keep the test always available.</p>
+                </div>
+
+                <!-- Global Negative Marking -->
+                <div class="input-group" style="margin-bottom: 0;">
+                    <label for="test-negative-marking">Global Negative Marking</label>
+                    <select id="test-negative-marking" class="input-control" style="cursor: pointer;">
+                        <option value="0">None (0)</option>
+                        <option value="-0.25">-1/4 per wrong answer</option>
+                        <option value="-0.33">-1/3 per wrong answer</option>
+                        <option value="-0.5">-1/2 per wrong answer</option>
+                        <option value="-1">-1 per wrong answer</option>
+                        <option value="-1.5">-3/2 per wrong answer</option>
+                        <option value="-2">-2 per wrong answer</option>
+                    </select>
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Applied to incorrect answers. Unanswered questions score 0.</p>
+                </div>
+
                 <div class="input-group" style="margin-bottom: 0; display: flex; align-items: center; gap: 0.5rem; flex-direction: row; cursor: pointer;">
                     <input type="checkbox" id="test-section-wise-timing" style="width: 1.1rem; height: 1.1rem; cursor: pointer;">
                     <label for="test-section-wise-timing" style="cursor: pointer; margin-bottom: 0; user-select: none; font-weight: 500;">Enable Section-Wise Timing</label>
@@ -1142,12 +1175,23 @@ export function renderAdminDashboard(user) {
                     <input type="number" class="input-control sec-duration-input" data-index="${sIdx}" value="${sec.duration}" min="1" required style="width: 100%;">
                     <span style="font-size: 0.75rem; color: var(--text-muted);">m</span>
                 </div>
+                <select class="input-control sec-neg-marking-select" data-index="${sIdx}" title="Section Negative Marking" style="cursor: pointer; font-size: 0.8rem; padding: 0.4rem;">
+                    <option value="global" ${!sec.negativeMarking ? 'selected' : ''}>Use Global</option>
+                    <option value="0" ${sec.negativeMarking === '0' ? 'selected' : ''}>None (0)</option>
+                    <option value="-0.25" ${sec.negativeMarking === '-0.25' ? 'selected' : ''}>-1/4</option>
+                    <option value="-0.33" ${sec.negativeMarking === '-0.33' ? 'selected' : ''}>-1/3</option>
+                    <option value="-0.5" ${sec.negativeMarking === '-0.5' ? 'selected' : ''}>-1/2</option>
+                    <option value="-1" ${sec.negativeMarking === '-1' ? 'selected' : ''}>-1</option>
+                    <option value="-1.5" ${sec.negativeMarking === '-1.5' ? 'selected' : ''}>-3/2</option>
+                    <option value="-2" ${sec.negativeMarking === '-2' ? 'selected' : ''}>-2</option>
+                </select>
                 ${builderSections.length > 1 ? `
                     <button class="icon-btn delete-section-btn" data-index="${sIdx}" title="Delete section" style="color: hsl(355, 78%, 56%); background: none; border: none; cursor: pointer;">
                         <i class="fas fa-trash-alt"></i>
                     </button>
                 ` : '<div style="width: 28px;"></div>'}
             `;
+            row.style.gridTemplateColumns = "2fr 1fr 1fr auto";
             
             row.querySelector(".sec-name-input").addEventListener("input", (e) => {
                 const idx = parseInt(e.target.getAttribute("data-index"), 10);
@@ -1175,6 +1219,15 @@ export function renderAdminDashboard(user) {
                     }
                 });
             });
+
+            const negSelect = row.querySelector(".sec-neg-marking-select");
+            if (negSelect) {
+                negSelect.addEventListener("change", (e) => {
+                    const idx = parseInt(e.target.getAttribute("data-index"), 10);
+                    const val = e.target.value;
+                    builderSections[idx].negativeMarking = val === 'global' ? null : val;
+                });
+            }
             
             const delBtn = row.querySelector(".delete-section-btn");
             if (delBtn) {
@@ -1270,6 +1323,12 @@ export function renderAdminDashboard(user) {
         }
 
         const sectionWiseTiming = paneBuilder.querySelector("#test-section-wise-timing")?.checked || false;
+        const negMarkingEl = paneBuilder.querySelector("#test-negative-marking");
+        const globalNegativeMarking = negMarkingEl ? parseFloat(negMarkingEl.value) : 0;
+        const windowStartEl = paneBuilder.querySelector("#test-window-start");
+        const windowEndEl = paneBuilder.querySelector("#test-window-end");
+        const windowStart = windowStartEl?.value ? new Date(windowStartEl.value).toISOString() : null;
+        const windowEnd = windowEndEl?.value ? new Date(windowEndEl.value).toISOString() : null;
 
         const newTest = {
             id,
@@ -1278,10 +1337,14 @@ export function renderAdminDashboard(user) {
             duration: parseInt(durationEl.value, 10) || 15,
             difficulty: diffEl.value,
             sectionWiseTiming,
+            negativeMarking: globalNegativeMarking,
+            windowStart,
+            windowEnd,
             sections: sectionWiseTiming ? builderSections.map(s => ({
                 name: s.name.trim(),
-                duration: parseInt(s.duration, 10) || 5
-            })) : [{ name: 'General', duration: parseInt(durationEl.value, 10) || 15 }],
+                duration: parseInt(s.duration, 10) || 5,
+                negativeMarking: s.negativeMarking !== undefined ? s.negativeMarking : null
+            })) : [{ name: 'General', duration: parseInt(durationEl.value, 10) || 15, negativeMarking: null }],
             questions: builderQuestions.map((q, idx) => ({
                 id: `bq-${idx}-${Date.now()}`,
                 type: q.type,

@@ -8,7 +8,11 @@ export function renderTestResults(attempt, onBackToDashboard) {
     const container = document.createElement("div");
     container.className = "dashboard-container fade-in";
 
-    const { testTitle, score, totalQuestions, correctCount, timeSpent, reviewDetails } = attempt;
+    const { testTitle, score, totalQuestions, correctCount, wrongCount, unattemptedCount, totalMarks, timeSpent, reviewDetails } = attempt;
+    // Fallbacks for older attempt records without new fields
+    const wCount = wrongCount ?? (totalQuestions - (correctCount || 0) - (unattemptedCount || 0));
+    const uCount = unattemptedCount ?? 0;
+    const rawMarks = totalMarks ?? correctCount;
 
     // Get candidate name from session
     const sessionUser = JSON.parse(sessionStorage.getItem("testabhi_session"));
@@ -47,21 +51,32 @@ export function renderTestResults(attempt, onBackToDashboard) {
 
             <!-- Score breakdown text -->
             <div style="margin-top: -0.5rem;">
-                <h3 style="font-size: 1.5rem; font-weight: 700; color: ${score >= 70 ? 'hsl(142, 70%, 45%)' : (score >= 40 ? 'hsl(38, 92%, 50%)' : 'hsl(355, 78%, 56%)')};">
+                <h3 style="font-size: 1.5rem; font-weight: 700; color: ${score >= 70 ? 'hsl(142, 70%, 45%)' : (score >= 40 ? 'hsl(38, 92%, 50%)' : 'hsl(355, 78%, 56%)');}">
                     ${score >= 80 ? 'Exceptional Performance!' : (score >= 40 ? 'Good Effort!' : 'Keep Learning!')}
                 </h3>
             </div>
 
             <!-- Statistics cards row -->
-            <div class="results-stats-row">
+            <div class="results-stats-row" style="grid-template-columns: repeat(2, 1fr); gap: 0.75rem;">
                 <div class="results-stat">
-                    <h5>${correctCount} / ${totalQuestions}</h5>
-                    <p>Correct Answers</p>
+                    <h5 style="color: hsl(142,70%,45%);">${correctCount}</h5>
+                    <p><i class="fas fa-check-circle" style="color:hsl(142,70%,45%);"></i> Correct</p>
                 </div>
                 <div class="results-stat">
-                    <h5>${formatTime(timeSpent)}</h5>
-                    <p>Time Spent</p>
+                    <h5 style="color: hsl(355,78%,56%);">${wCount}</h5>
+                    <p><i class="fas fa-times-circle" style="color:hsl(355,78%,56%);"></i> Wrong</p>
                 </div>
+                <div class="results-stat">
+                    <h5 style="color: var(--text-muted);">${uCount}</h5>
+                    <p><i class="far fa-circle" style="color:var(--text-muted);"></i> Skipped</p>
+                </div>
+                <div class="results-stat">
+                    <h5>${rawMarks.toFixed ? rawMarks.toFixed(2) : rawMarks} / ${totalQuestions}</h5>
+                    <p><i class="fas fa-star" style="color:hsl(43,96%,56%);"></i> Marks Earned</p>
+                </div>
+            </div>
+            <div style="text-align:center; color: var(--text-secondary); font-size:0.85rem; margin-top:-0.5rem;">
+                <i class="far fa-clock"></i> Time Spent: <strong>${formatTime(timeSpent)}</strong>
             </div>
 
             <!-- Dashboard Exit Control -->

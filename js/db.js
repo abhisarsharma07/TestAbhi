@@ -507,12 +507,17 @@ export async function authenticateUser(username, password) {
     }
     
     const user = userSnap.data();
-    if (user.password === password) {
-        cache.users[cleanUsername] = user;
-        return { username: cleanUsername, ...user };
+    if (user.password !== password) {
+        return null; // wrong password
+    }
+
+    // Faculty must be approved by admin before logging in
+    if (user.role === 'faculty' && user.approved === false) {
+        throw new Error('PENDING_APPROVAL');
     }
     
-    return null; // wrong password
+    cache.users[cleanUsername] = user;
+    return { username: cleanUsername, ...user };
 }
 
 export async function registerUser(username, password, name, role) {
@@ -553,7 +558,9 @@ export async function registerUser(username, password, name, role) {
         return { success: false, message: "Username already taken. Please choose another." };
     }
 
-    const newUser = { role, password, name: cleanName, history: [] };
+    // Faculty accounts require admin approval before they can log in
+    const approved = role === 'faculty' ? false : true;
+    const newUser = { role, password, name: cleanName, history: [], approved };
     
     // Write to Firestore FIRST, then update cache
     try {
@@ -567,7 +574,10 @@ export async function registerUser(username, password, name, role) {
     }
     
     cache.users[cleanUsername] = newUser; // Only cache AFTER successful write
-    return { success: true, message: "Account created successfully!" };
+    const successMsg = role === 'faculty'
+        ? "Account created! Awaiting administrator approval before you can log in."
+        : "Account created successfully!";
+    return { success: true, message: successMsg };
 }
 
 export async function updateUserProfile(username, newName, newPassword) {
@@ -600,5 +610,45 @@ export async function saveTestAttempt(username, attempt) {
         return true;
     }
     return false;
+}
+
+// Approve a faculty account (admin action)
+export async function approveFaculty(username) {
+    const cleanUsername = username.toLowerCase().trim();
+    const userRef = doc(db, 'users', cleanUsername);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+        const userData = userSnap.data();
+        userData.approved = true;
+        cache.users[cleanUsername] = userData;
+        await setDoc(userRef, userData);
+        return { success: true };
+    }
+    return { success: false };
+}
+
+// Fetch leaderboard for a specific test (ranks all students by score desc, time asc)
+export async function fetchLeaderboard(testId) {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    const entries = [];
+    usersSnap.docs.forEach(d => {
+        const u = d.data();
+        if (u.role !== 'student') return;
+        const attempt = (u.history || []).find(h => h.testId === testId);
+        if (attempt) {
+            entries.push({
+                name: u.name,
+                username: d.id,
+                score: attempt.score,
+                correctCount: attempt.correctCount,
+                totalQuestions: attempt.totalQuestions,
+                timeSpent: attempt.timeSpent,
+                date: attempt.date
+            });
+        }
+    });
+    // Sort: highest score first, then shortest time
+    entries.sort((a, b) => b.score - a.score || a.timeSpent - b.timeSpent);
+    return entries;
 }
 

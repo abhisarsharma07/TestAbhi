@@ -551,16 +551,34 @@ export function renderTestInterface(user, test, onSubmitTest) {
         }
         document.body.classList.remove("taking-test");
 
-        // Grade the test
-        let score = 0;
+        // Grade the test with negative marking support
+        let totalMarks = 0;       // raw marks earned (can be negative per wrong answer)
         let correctCount = 0;
+        let wrongCount = 0;
+        let unattemptedCount = 0;
         const reviewDetails = [];
 
         test.questions.forEach(q => {
             const studentAns = studentAnswers[q.id];
+
+            // Resolve negative marking penalty for this question
+            // Priority: section-level > global test level > 0
+            let negPenalty = 0;
+            if (test.negativeMarking && test.negativeMarking < 0) {
+                negPenalty = test.negativeMarking; // e.g. -0.5, -1
+            }
+            if (isSectionWise && q.sectionName && test.sections) {
+                const matchedSection = test.sections.find(s => s.name === q.sectionName);
+                if (matchedSection && matchedSection.negativeMarking !== null && matchedSection.negativeMarking !== undefined) {
+                    negPenalty = matchedSection.negativeMarking;
+                }
+            }
+
             let isCorrect = false;
+            let isAttempted = false;
 
             if (q.type === 'single') {
+                isAttempted = studentAns !== '' && studentAns !== undefined && studentAns !== null;
                 isCorrect = studentAns === q.answer;
                 reviewDetails.push({
                     questionText: q.text,
@@ -572,7 +590,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
                     type: q.type
                 });
             } else if (q.type === 'multi') {
-                // Check if arrays hold the exact same elements
+                isAttempted = Array.isArray(studentAns) && studentAns.length > 0;
                 const isMatch = Array.isArray(studentAns) && 
                                 studentAns.length === q.answers.length && 
                                 studentAns.every(val => q.answers.includes(val));
@@ -587,6 +605,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
                     type: q.type
                 });
             } else if (q.type === 'text') {
+                isAttempted = !!(studentAns && studentAns.trim());
                 const normalizedStudent = (studentAns || '').toLowerCase().trim();
                 const normalizedCorrect = q.answer.toLowerCase().trim();
                 isCorrect = normalizedStudent === normalizedCorrect;
@@ -599,6 +618,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
                     type: q.type
                 });
             } else if (q.type === 'code') {
+                isAttempted = !!(studentAns && studentAns.trim());
                 const funcMatch = q.template.match(/function\s+([a-zA-Z0-9_]+)/);
                 const funcName = funcMatch ? funcMatch[1] : '';
                 let allAssertsPassed = true;
@@ -620,10 +640,23 @@ export function renderTestInterface(user, test, onSubmitTest) {
                 });
             }
 
-            if (isCorrect) correctCount++;
+            // Apply marks
+            if (isCorrect) {
+                totalMarks += 1;
+                correctCount++;
+            } else if (isAttempted && !isCorrect) {
+                totalMarks += negPenalty; // penalty (negative value adds negative marks)
+                wrongCount++;
+            } else {
+                unattemptedCount++;
+                // unattempted = 0 marks, no penalty
+            }
         });
 
-        score = Math.round((correctCount / totalQuestions) * 100);
+        // Clamp marks to 0 minimum, compute percentage
+        const clampedMarks = Math.max(0, totalMarks);
+        const score = Math.round((clampedMarks / totalQuestions) * 100);
+
         let timeSpent = 0;
         if (isSectionWise) {
             for (let s = 0; s < currentSectionIdx; s++) {
@@ -641,6 +674,9 @@ export function renderTestInterface(user, test, onSubmitTest) {
             score,
             totalQuestions,
             correctCount,
+            wrongCount,
+            unattemptedCount,
+            totalMarks: clampedMarks,
             timeSpent,
             date: new Date().toISOString().split('T')[0],
             reviewDetails

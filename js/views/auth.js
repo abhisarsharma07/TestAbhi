@@ -69,7 +69,11 @@ export function renderAuthView(onLoginSuccess) {
                     }
                 } catch (err) {
                     console.error("Login error:", err);
-                    showToast(`Login error: ${err.message || "Please check your connection and try again."}`, "error");
+                    if (err.message === 'PENDING_APPROVAL') {
+                        showToast("Your faculty account is pending admin approval. Please check back later.", "warning", 6000);
+                    } else {
+                        showToast(`Login error: ${err.message || "Please check your connection and try again."}`, "error");
+                    }
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = 'Sign In <i class="fas fa-arrow-right"></i>';
                 }

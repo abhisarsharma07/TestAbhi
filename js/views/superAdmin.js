@@ -1,4 +1,4 @@
-import { getUsers, saveUsers, fetchAllUsers } from '../db.js';
+import { getUsers, saveUsers, fetchAllUsers, approveFaculty } from '../db.js';
 import { showToast } from '../utils.js';
 
 export function renderSuperAdminDashboard(currentUser) {
@@ -28,6 +28,7 @@ export function renderSuperAdminDashboard(currentUser) {
 
         const totalStudents = userList.filter(u => u.role === 'student').length;
         const totalFaculty = userList.filter(u => u.role === 'faculty').length;
+        const pendingFaculty = userList.filter(u => u.role === 'faculty' && u.approved === false);
 
         container.innerHTML = `
             <div class="welcome-banner">
@@ -47,6 +48,29 @@ export function renderSuperAdminDashboard(currentUser) {
                     <div class="stat-label">Registered Faculty Members</div>
                 </div>
             </div>
+
+            <!-- Pending Faculty Approvals -->
+            ${pendingFaculty.length > 0 ? `
+            <div class="approval-banner">
+                <div class="approval-banner-header">
+                    <i class="fas fa-user-clock"></i>
+                    <span>${pendingFaculty.length} Faculty Account${pendingFaculty.length > 1 ? 's' : ''} Awaiting Approval</span>
+                </div>
+                <div class="approval-list">
+                    ${pendingFaculty.map(u => `
+                        <div class="approval-card">
+                            <div class="approval-info">
+                                <div class="approval-name">${u.name}</div>
+                                <div class="approval-meta">@${u.username} &middot; Faculty</div>
+                            </div>
+                            <button class="btn btn-primary approve-faculty-btn" data-username="${u.username}" style="padding: 0.4rem 1rem; font-size: 0.8rem; white-space: nowrap;">
+                                <i class="fas fa-check-circle"></i> Approve
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+            ` : ''}
 
             <!-- User Management Table Panel -->
             <div class="sidebar-panel" style="margin-top: 1.5rem; background-color: var(--bg-card); border: var(--glass-border); border-radius: var(--border-radius-md); padding: 2rem;">
@@ -105,6 +129,23 @@ export function renderSuperAdminDashboard(currentUser) {
         `;
 
         // Bind Actions
+        container.querySelectorAll(".approve-faculty-btn").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Approving...';
+                const targetUser = btn.dataset.username;
+                const result = await approveFaculty(targetUser);
+                if (result.success) {
+                    showToast(`Faculty account @${targetUser} approved successfully!`, "success");
+                    renderPanel();
+                } else {
+                    showToast(`Failed to approve @${targetUser}.`, "error");
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-check-circle"></i> Approve';
+                }
+            });
+        });
+
         container.querySelectorAll(".toggle-role-btn").forEach(btn => {
             btn.addEventListener("click", async () => {
                 btn.disabled = true;

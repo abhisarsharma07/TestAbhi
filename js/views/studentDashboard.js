@@ -2,7 +2,7 @@
    TestAbhi - Student Dashboard View
 ------------------------------------------------------------- */
 
-import { getTests } from '../db.js';
+import { getTests, fetchLeaderboard } from '../db.js';
 import { navigate } from '../app.js';
 import { formatTime, formatDate } from '../utils.js';
 
@@ -95,7 +95,21 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
 
     const tests = getTests();
 
-    // Render HTML structure
+    // Helper: schedule window status for a test
+    function getScheduleStatus(test) {
+        const now = new Date();
+        if (test.windowStart && new Date(test.windowStart) > now) {
+            return { type: 'upcoming', label: `Starts ${new Date(test.windowStart).toLocaleString()}` };
+        }
+        if (test.windowEnd && new Date(test.windowEnd) < now) {
+            return { type: 'expired', label: 'Expired' };
+        }
+        if (test.windowEnd) {
+            return { type: 'active', label: `Closes ${new Date(test.windowEnd).toLocaleString()}` };
+        }
+        return { type: 'always', label: null };
+    }
+
     container.innerHTML = `
         <!-- Welcome Banner -->
         <div class="welcome-banner">
@@ -117,6 +131,18 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
                             <p>No tests are currently active. Check back later.</p>
                         </div>
                     ` : tests.map(test => {
+                        const sched = getScheduleStatus(test);
+                        const canStart = sched.type === 'always' || sched.type === 'active';
+                        const negLabel = test.negativeMarking && test.negativeMarking < 0
+                            ? `<span style="color: hsl(0,80%,60%); font-size:0.75rem;"><i class="fas fa-minus-circle"></i> Negative Marking: ${test.negativeMarking}</span>`
+                            : '';
+                        const schedBadge = sched.type === 'upcoming'
+                            ? `<div class="schedule-badge upcoming"><i class="fas fa-clock"></i> ${sched.label}</div>`
+                            : sched.type === 'expired'
+                            ? `<div class="schedule-badge expired"><i class="fas fa-ban"></i> ${sched.label}</div>`
+                            : sched.label
+                            ? `<div class="schedule-badge active"><i class="fas fa-hourglass-half"></i> ${sched.label}</div>`
+                            : '';
                         return `
                             <div class="test-card">
                                 <div class="test-card-header">
@@ -126,13 +152,20 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
                                 <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; flex: 1;">
                                     ${test.description}
                                 </p>
+                                ${negLabel}
+                                ${schedBadge}
                                 <div class="test-meta">
                                     <span><i class="far fa-clock"></i> ${test.duration} mins</span>
                                     <span><i class="far fa-question-circle"></i> ${test.questions.length} Questions</span>
                                 </div>
-                                <button class="btn btn-primary start-test-btn" data-id="${test.id}" style="width: 100%; justify-content: center; margin-top: 0.5rem;">
-                                    Start Assessment <i class="fas fa-play"></i>
-                                </button>
+                                <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+                                    <button class="btn btn-primary start-test-btn" data-id="${test.id}" style="flex: 1; justify-content: center;" ${!canStart ? 'disabled' : ''}>
+                                        ${sched.type === 'expired' ? '<i class="fas fa-ban"></i> Expired' : sched.type === 'upcoming' ? '<i class="fas fa-clock"></i> Not Yet Open' : 'Start Assessment <i class="fas fa-play"></i>'}
+                                    </button>
+                                    <button class="btn btn-secondary leaderboard-btn" data-id="${test.id}" title="View Leaderboard" style="padding: 0.6rem 0.9rem;">
+                                        <i class="fas fa-trophy"></i>
+                                    </button>
+                                </div>
                             </div>
                         `;
                     }).join('')}
@@ -214,11 +247,28 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
         </div>
     `;
 
-    // Click handler for starting a test
+    // Click handler for starting a test (shows instruction overlay first)
     container.querySelectorAll(".start-test-btn").forEach(btn => {
         btn.addEventListener("click", () => {
+            if (btn.disabled) return;
             const testId = btn.getAttribute("data-id");
-            onSelectTest(testId);
+            const test = tests.find(t => t.id === testId);
+            if (!test) return;
+            showInstructionOverlay(test, () => onSelectTest(testId));
+        });
+    });
+
+    // Leaderboard trophy button
+    container.querySelectorAll(".leaderboard-btn").forEach(btn => {
+        btn.addEventListener("click", async () => {
+            const testId = btn.getAttribute("data-id");
+            const test = tests.find(t => t.id === testId);
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            const entries = await fetchLeaderboard(testId);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-trophy"></i>';
+            showLeaderboardModal(test, entries);
         });
     });
 
@@ -241,4 +291,123 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
     });
 
     return container;
+}
+
+// Pre-exam instruction overlay
+function showInstructionOverlay(test, onConfirm) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+
+    const negLabel = test.negativeMarking && test.negativeMarking < 0
+        ? `<div class="instruction-row warn"><i class="fas fa-minus-circle"></i> <span>Negative marking active: <strong>${test.negativeMarking}</strong> per wrong answer. Unanswered questions score 0.</span></div>`
+        : `<div class="instruction-row ok"><i class="fas fa-check-circle"></i> <span>No negative marking for this test.</span></div>`;
+
+    const sections = test.sectionWiseTiming && test.sections
+        ? test.sections.map(s => {
+            const sNeg = s.negativeMarking !== null && s.negativeMarking !== undefined ? s.negativeMarking : (test.negativeMarking || 0);
+            return `<li><strong>${s.name}</strong> — ${s.duration} min${sNeg < 0 ? `, negative: ${sNeg}` : ''}</li>`;
+        }).join('')
+        : `<li>Single section — ${test.duration} minutes</li>`;
+
+    overlay.innerHTML = `
+        <div class="modal-content instruction-modal">
+            <div class="instruction-header">
+                <i class="fas fa-clipboard-list"></i>
+                <h2>Before You Start</h2>
+                <p>${test.title}</p>
+            </div>
+
+            <div class="instruction-body">
+                <h3><i class="fas fa-info-circle"></i> Exam Details</h3>
+                <ul class="instruction-details-list">
+                    <li><i class="far fa-clock"></i> Duration: <strong>${test.duration} minutes</strong></li>
+                    <li><i class="far fa-question-circle"></i> Questions: <strong>${test.questions.length}</strong></li>
+                    <li><i class="fas fa-layer-group"></i> Sections: <ul style="margin-top:0.5rem;padding-left:1rem;">${sections}</ul></li>
+                </ul>
+
+                <h3><i class="fas fa-shield-alt"></i> Marking Scheme</h3>
+                <div class="instruction-rules">
+                    <div class="instruction-row ok"><i class="fas fa-check-circle"></i> <span>+1 mark for each correct answer</span></div>
+                    ${negLabel}
+                </div>
+
+                <h3><i class="fas fa-eye"></i> Proctoring Rules</h3>
+                <div class="instruction-rules">
+                    <div class="instruction-row warn"><i class="fas fa-expand"></i> <span>The exam will run in fullscreen. Exiting fullscreen is a security violation.</span></div>
+                    <div class="instruction-row warn"><i class="fas fa-window-restore"></i> <span>Do not switch browser tabs or windows during the exam.</span></div>
+                    <div class="instruction-row warn"><i class="fas fa-camera"></i> <span>Webcam access may be requested for identity verification.</span></div>
+                    <div class="instruction-row warn"><i class="fas fa-ban"></i> <span>Any violations are recorded and reported to the faculty.</span></div>
+                </div>
+
+                <label class="instruction-agree-row" for="instruction-agree-chk">
+                    <input type="checkbox" id="instruction-agree-chk">
+                    <span>I have read and agree to follow all exam proctoring guidelines.</span>
+                </label>
+            </div>
+
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+                <button class="btn btn-secondary" id="instr-cancel-btn" style="flex: 1; justify-content: center;">Cancel</button>
+                <button class="btn btn-primary" id="instr-start-btn" style="flex: 1; justify-content: center;" disabled>
+                    <i class="fas fa-play"></i> Begin Exam
+                </button>
+            </div>
+        </div>
+    `;
+
+    const chk = overlay.querySelector("#instruction-agree-chk");
+    const startBtn = overlay.querySelector("#instr-start-btn");
+    chk.addEventListener("change", () => { startBtn.disabled = !chk.checked; });
+    overlay.querySelector("#instr-cancel-btn").addEventListener("click", () => overlay.remove());
+    startBtn.addEventListener("click", () => { overlay.remove(); onConfirm(); });
+
+    document.body.appendChild(overlay);
+}
+
+// Leaderboard modal
+function showLeaderboardModal(test, entries) {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+
+    const medalColors = ['hsl(43,96%,56%)', 'hsl(220,14%,75%)', 'hsl(28,65%,52%)'];
+    const rankIcons = ['🥇', '🥈', '🥉'];
+
+    const rows = entries.length === 0
+        ? `<p style="text-align:center; color: var(--text-muted); padding: 2rem 0;">No attempts yet for this test.</p>`
+        : entries.map((e, i) => {
+            const medal = i < 3 ? `<span style="font-size:1.4rem;">${rankIcons[i]}</span>` : `<span class="rank-number">#${i + 1}</span>`;
+            const timeStr = e.timeSpent ? formatTime(e.timeSpent) : 'N/A';
+            const scoreClass = e.score >= 70 ? 'status-correct' : e.score >= 40 ? 'text-warning' : 'status-incorrect';
+            return `
+                <div class="leaderboard-row ${i < 3 ? 'top-rank' : ''}" style="${i < 3 ? `border-left: 3px solid ${medalColors[i]};` : ''}">
+                    <div class="leaderboard-rank">${medal}</div>
+                    <div class="leaderboard-info">
+                        <div class="leaderboard-name">${e.name}</div>
+                        <div class="leaderboard-meta">@${e.username} &middot; Time: ${timeStr}</div>
+                    </div>
+                    <div class="leaderboard-score ${scoreClass}">${e.score}%</div>
+                </div>
+            `;
+        }).join('');
+
+    overlay.innerHTML = `
+        <div class="modal-content leaderboard-modal">
+            <div class="leaderboard-header">
+                <span style="font-size:2rem;">🏆</span>
+                <div>
+                    <h2>Leaderboard</h2>
+                    <p style="color: var(--text-secondary); font-size: 0.9rem;">${test.title}</p>
+                </div>
+            </div>
+            <div class="leaderboard-list">
+                ${rows}
+            </div>
+            <div style="text-align: center; margin-top: 1rem;">
+                <button class="btn btn-secondary" id="lb-close-btn" style="padding: 0.6rem 2rem;">Close</button>
+            </div>
+        </div>
+    `;
+
+    overlay.querySelector("#lb-close-btn").addEventListener("click", () => overlay.remove());
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
 }
