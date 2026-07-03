@@ -677,178 +677,136 @@ export function renderAdminDashboard(user) {
             });
         });
 
-        // Split text into lines to separate question blocks
-        const lines = text.split(/\r?\n/);
-        const blocks = [];
-        let currentBlock = [];
+        // Pre-process text to add newlines before options, answers, and question starters if they are on a single line
+        let cleanedText = text;
+        // Add newlines before option letters A-E
+        cleanedText = cleanedText.replace(/\s+([A-Ea-e])\s*[\)\.\-\:\u2013\u2014]\s+/g, '\n$1) ');
+        // Add newlines before Answer keywords
+        cleanedText = cleanedText.replace(/\s+(Correct\s+Answer|Answer|Ans|Key|Correct\s+Option)\s*[\:\-\=]\s*/gi, '\nAnswer: ');
+        
+        // Add newlines before common question starter words/patterns
+        const questionStarters = ['What', 'Which', 'How', 'Who', 'Where', 'When', 'Is', 'Are', 'Do', 'Does', 'Did', 'If', 'The', 'Select', 'Write', 'In', 'On', 'At', 'Identify', 'Choose', 'Q\\d+', '\\d+'];
+        const starterPattern = new RegExp(`\\s+(${questionStarters.join('|')})\\b`, 'gi');
+        cleanedText = cleanedText.replace(starterPattern, '\n$1');
 
-        const isNewQuestionStart = (line) => {
-            const trimmed = line.trim();
-            // Match e.g. "1.", "Q1:", "Question 2)", "10 -"
-            if (/^\s*(?:Q|Question\s*)?\d+\s*[\.\)\:\-\u2013\u2014]/i.test(trimmed)) {
-                return true;
-            }
-            // Match brackets or parentheses e.g. "[2]", "(3)"
-            if (/^\s*[\[\(]\d+[\]\)]/i.test(trimmed)) {
-                return true;
-            }
-            return false;
+        // Split into lines
+        const rawLines = cleanedText.split(/\r?\n/);
+        const lines = rawLines.map(l => l.trim()).filter(Boolean);
+
+        let currentQ = {
+            text: '',
+            options: [],
+            correctOptionIndexes: [],
+            explanation: '',
+            textAnswer: ''
         };
 
-        const isSectionStart = (line) => {
-            return /^\s*(?:Part|Section)\s+[A-Z0-9]+/i.test(line);
-        };
+        const finalizeCurrentQ = () => {
+            if (!currentQ.text.trim()) return;
 
-        lines.forEach(line => {
-            const trimmed = line.trim();
-            if (!trimmed) return;
-
-            if (isNewQuestionStart(line) || isSectionStart(line)) {
-                if (currentBlock.length > 0) {
-                    blocks.push(currentBlock.join('\n'));
-                }
-                currentBlock = [line];
-            } else {
-                currentBlock.push(line);
-            }
-        });
-        if (currentBlock.length > 0) {
-            blocks.push(currentBlock.join('\n'));
-        }
-
-        blocks.forEach((blockText) => {
-            if (isSectionStart(blockText)) return;
-
-            const qIndex = text.indexOf(blockText);
+            // Find matching parsed section based on position in original text
             let assignedSection = null;
+            const textIdx = text.indexOf(currentQ.text.slice(0, 30));
             for (let s = sectionsParsed.length - 1; s >= 0; s--) {
-                if (qIndex >= sectionsParsed[s].startIndex) {
+                if (textIdx >= sectionsParsed[s].startIndex) {
                     assignedSection = sectionsParsed[s];
                     break;
                 }
             }
             const secName = assignedSection ? assignedSection.name : 'General';
 
-            const blockLines = blockText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-            if (blockLines.length === 0) return;
-
-            let questionBody = '';
-            const options = [];
-            const correctOptionIndexes = [];
-            let explanation = '';
-            let parsingOptions = false;
-
-            // Robust checks for different option letter indicators (A. or A) or a. or a))
-            const optionPrefixRegex = /^\s*([A-Ea-e])\s*[\.\)\-\:\u2013\u2014]\s*(.+)$/;
-            const answerRegex = /(?:Correct\s*Answer|Answer|Ans|Key|Correct\s*Option)\s*[\:\-\=]?\s*([A-Ea-e\s\,]+)/i;
-            const explanationRegex = /(?:Explanation|Exp|Reason)\s*[\:\-\=]?\s*(.+)$/i;
-
-            blockLines.forEach(line => {
-                const optMatch = line.match(optionPrefixRegex);
-                const ansMatch = line.match(answerRegex);
-                const expMatch = line.match(explanationRegex);
-
-                if (expMatch) {
-                    explanation = expMatch[1].trim();
-                } else if (ansMatch) {
-                    const rawAns = ansMatch[1].toUpperCase().replace(/[^A-E]/g, '');
-                    for (let c of rawAns) {
-                        const idx = c.charCodeAt(0) - 65;
-                        if (idx >= 0 && idx < 5 && !correctOptionIndexes.includes(idx)) {
-                            correctOptionIndexes.push(idx);
-                        }
-                    }
-                } else if (optMatch) {
-                    parsingOptions = true;
-                    let optText = optMatch[2].trim();
-                    const letter = optMatch[1].toUpperCase();
-                    const isMarkedCorrect = optText.toLowerCase().includes('(correct)') || optText.endsWith('*') || line.startsWith('*');
-                    
-                    optText = optText.replace(/\(correct\)/gi, '').replace(/\*$/, '').trim();
-                    options.push(optText);
-
-                    if (isMarkedCorrect) {
-                        const idx = letter.charCodeAt(0) - 65;
-                        if (!correctOptionIndexes.includes(idx)) {
-                            correctOptionIndexes.push(idx);
-                        }
-                    }
-                } else {
-                    if (!parsingOptions) {
-                        if (questionBody) questionBody += ' ';
-                        questionBody += line;
-                    } else {
-                        // Append multi-line option text
-                        if (options.length > 0) {
-                            options[options.length - 1] += ' ' + line;
-                        }
-                    }
-                }
-            });
-
-            // Strip leading numbering tags from the body
-            questionBody = questionBody
+            const cleanText = currentQ.text
                 .replace(/^\s*(?:Q|Question\s*)?\d+\s*[\.\)\:\-\u2013\u2014]\s*/i, '')
                 .replace(/^\s*[\[\(]\d+[\]\)]\s*/, '')
                 .trim();
 
-            if (!questionBody) return;
-
-            if (options.length >= 2) {
-                // Check if we still have no correct answer index
-                if (correctOptionIndexes.length === 0) {
-                    const fallbackMatch = blockText.match(/(?:Correct\s*Answer|Answer|Ans|Key|Correct\s*Option)\s*[\:\-\=]?\s*([A-E])/i);
-                    if (fallbackMatch) {
-                        const idx = fallbackMatch[1].toUpperCase().charCodeAt(0) - 65;
-                        correctOptionIndexes.push(idx);
-                    }
-                }
-
-                const isMulti = correctOptionIndexes.length > 1;
-                if (isMulti) {
-                    questions.push({
-                        id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                        text: questionBody,
-                        type: 'multi',
-                        options: options,
-                        answers: correctOptionIndexes,
-                        sectionName: secName,
-                        sectionDuration: 5,
-                        explanation: explanation || "Parsed dynamically (Multiple Response MCQ)."
-                    });
-                } else {
-                    const ans = correctOptionIndexes.length > 0 ? correctOptionIndexes[0] : 0;
-                    questions.push({
-                        id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                        text: questionBody,
-                        type: 'single',
-                        options: options,
-                        answer: ans,
-                        sectionName: secName,
-                        sectionDuration: 5,
-                        explanation: explanation || "Parsed dynamically (Single Choice MCQ)."
-                    });
-                }
-            } else {
-                // Text Entry fallback
-                let textAnswer = '';
-                const textAnsMatch = blockText.match(/(?:Correct\s*Answer|Answer|Ans|Key)\s*[\:\-\=]?\s*(.+)$/im);
-                if (textAnsMatch) {
-                    textAnswer = textAnsMatch[1].trim();
-                }
-
+            if (currentQ.options.length >= 2) {
+                const isMulti = currentQ.correctOptionIndexes.length > 1;
                 questions.push({
                     id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-                    text: questionBody,
-                    type: 'text',
-                    options: ['', ''],
-                    answer: textAnswer,
+                    text: cleanText,
+                    type: isMulti ? 'multi' : 'single',
+                    options: currentQ.options,
+                    ...(isMulti ? { answers: currentQ.correctOptionIndexes } : { answer: currentQ.correctOptionIndexes[0] || 0 }),
                     sectionName: secName,
                     sectionDuration: 5,
-                    explanation: explanation || "Parsed dynamically (Short Text Entry)."
+                    explanation: currentQ.explanation || `Parsed dynamically (${isMulti ? 'Multiple Response' : 'Single Choice'} MCQ).`
+                });
+            } else {
+                questions.push({
+                    id: `parsed-q-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+                    text: cleanText,
+                    type: 'text',
+                    options: ['', ''],
+                    answer: currentQ.textAnswer || '',
+                    sectionName: secName,
+                    sectionDuration: 5,
+                    explanation: currentQ.explanation || "Parsed dynamically (Short Text Entry)."
                 });
             }
+        };
+
+        const optionPrefixRegex = /^([A-Ea-e])\s*[\.\)\-\:\u2013\u2014]\s*(.+)$/;
+        const answerRegex = /^(?:Correct\s*Answer|Answer|Ans|Key|Correct\s*Option)\s*[\:\-\=]?\s*(.+)$/i;
+        const explanationRegex = /^(?:Explanation|Exp|Reason)\s*[\:\-\=]?\s*(.+)$/i;
+
+        lines.forEach(line => {
+            const optMatch = line.match(optionPrefixRegex);
+            const ansMatch = line.match(answerRegex);
+            const expMatch = line.match(explanationRegex);
+            const isSec = /^(?:Part|Section)\s+[A-Z0-9]+/i.test(line);
+
+            if (isSec) return;
+
+            if (expMatch) {
+                currentQ.explanation = expMatch[1].trim();
+            } else if (ansMatch) {
+                const rawAnsVal = ansMatch[1].trim();
+                // Extract answer keys starting at option keys (e.g. "B" or "B, C")
+                const optionKeysMatch = rawAnsVal.match(/^\s*([A-E](?:\s*,\s*[A-E])*)/i);
+                if (optionKeysMatch) {
+                    const parsedAnsLetters = optionKeysMatch[1].toUpperCase().replace(/[^A-E]/g, '');
+                    for (let c of parsedAnsLetters) {
+                        const idx = c.charCodeAt(0) - 65;
+                        if (idx >= 0 && idx < 5 && !currentQ.correctOptionIndexes.includes(idx)) {
+                            currentQ.correctOptionIndexes.push(idx);
+                        }
+                    }
+                }
+                currentQ.textAnswer = rawAnsVal;
+            } else if (optMatch) {
+                let optText = optMatch[2].trim();
+                const letter = optMatch[1].toUpperCase();
+                const isMarkedCorrect = optText.toLowerCase().includes('(correct)') || optText.endsWith('*') || line.startsWith('*');
+                
+                optText = optText.replace(/\(correct\)/gi, '').replace(/\*$/, '').trim();
+                currentQ.options.push(optText);
+
+                if (isMarkedCorrect) {
+                    const idx = letter.charCodeAt(0) - 65;
+                    if (!currentQ.correctOptionIndexes.includes(idx)) {
+                        currentQ.correctOptionIndexes.push(idx);
+                    }
+                }
+            } else {
+                const hasAnswersOrOptions = currentQ.options.length > 0 || currentQ.correctOptionIndexes.length > 0 || currentQ.textAnswer;
+                if (hasAnswersOrOptions) {
+                    finalizeCurrentQ();
+                    currentQ = {
+                        text: line,
+                        options: [],
+                        correctOptionIndexes: [],
+                        explanation: '',
+                        textAnswer: ''
+                    };
+                } else {
+                    if (currentQ.text) currentQ.text += ' ';
+                    currentQ.text += line;
+                }
+            }
         });
+
+        finalizeCurrentQ();
 
         // Compute sections duration
         sectionsParsed.forEach(sec => {
