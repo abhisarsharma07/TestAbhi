@@ -2907,3 +2907,522 @@ body:not(.taking-test) .webcam-container {
     }
 }
 
+
+/* =============================================================
+   GLOBAL MOBILE RESPONSIVE SYSTEM
+   Breakpoints: 768px (tablet) → 600px (large phone) → 400px (small phone)
+   ============================================================= */
+
+/* ---- 768px: Tablet & Large Phones ---- */
+@media (max-width: 768px) {
+
+    /* === HEADER === */
+    .app-header {
+        padding: 0.85rem 4%;
+        gap: 0.5rem;
+    }
+
+    .brand {
+        font-size: 1.25rem;
+        gap: 0.5rem;
+    }
+
+    .brand-logo {
+        height: 30px;
+        width: 30px;
+    }
+
+    .nav-right {
+        gap: 0.6rem;
+    }
+
+    .theme-toggle,
+    .logout-btn,
+    .icon-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 0.95rem;
+    }
+
+    /* === DASHBOARD SHELL === */
+    .dashboard-container {
+        padding: 1.25rem 4% !important;
+        gap: 1.25rem !important;
+    }
+
+    /* === WELCOME BANNER === */
+    .welcome-banner {
+        padding: 1.5rem 1.25rem !important;
+        border-radius: var(--border-radius-sm) !important;
+    }
+
+    .welcome-banner h1 {
+        font-size: 1.5rem !important;
+        line-height: 1.25 !important;
+    }
+
+    .welcome-banner p {
+        font-size: 0.88rem !important;
+        max-width: 100% !important;
+    }
+
+    .welcome-banner-shapes {
+        width: 180px;
+        height: 180px;
+        right: -8%;
+        top: -30%;
+    }
+
+    /* === STAT GRIDS === */
+    .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.85rem !important;
+    }
+
+    .superadmin-stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+
+    .creator-config-grid,
+    .question-config-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+
+    .stat-item {
+        padding: 0.85rem;
+    }
+
+    .stat-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+    }
+
+    .stat-details h4 {
+        font-size: 1.1rem;
+    }
+
+    /* === TEST CARDS === */
+    .test-cards-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+
+    .test-card {
+        padding: 1.25rem;
+    }
+
+    /* === ADMIN TABS === */
+    .admin-tabs {
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 0.5rem !important;
+    }
+
+    .admin-tab-btn {
+        flex: 1 1 calc(50% - 0.5rem) !important;
+        justify-content: center !important;
+        padding: 0.65rem 0.75rem !important;
+        font-size: 0.82rem !important;
+        min-width: 0 !important;
+    }
+
+    /* === ADMIN TABLE === */
+    .admin-table-wrapper {
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        border-radius: var(--border-radius-sm);
+        border: 1px solid var(--border-color);
+    }
+
+    .admin-table-wrapper table {
+        min-width: 560px;
+    }
+
+    /* === CODE SPLIT CONTAINER (profile/quiz editor) === */
+    .code-split-container {
+        flex-direction: column !important;
+        display: flex !important;
+        gap: 1.25rem !important;
+    }
+
+    .code-instructions-pane {
+        width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        padding-bottom: 1.5rem !important;
+    }
+
+    .code-editor-pane {
+        width: 100% !important;
+    }
+
+    /* === TEST INTERFACE === */
+    .test-interface-wrapper {
+        grid-template-columns: 1fr !important;
+    }
+
+    .test-content-area {
+        padding: 1.5rem 4% !important;
+    }
+
+    .test-header-bar {
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-bottom: 1.5rem !important;
+    }
+
+    .test-title-info h2 {
+        font-size: 1.1rem;
+    }
+
+    .timer-box {
+        font-size: 0.9rem;
+        padding: 0.5rem 0.9rem;
+    }
+
+    .test-sidebar {
+        border-top: 1px solid var(--border-color) !important;
+        border-left: none !important;
+        height: auto !important;
+        position: static !important;
+        width: 100% !important;
+        padding: 1.25rem !important;
+    }
+
+    .question-actions-bar {
+        flex-wrap: wrap !important;
+        gap: 0.75rem !important;
+    }
+
+    .question-actions-bar button {
+        flex: 1 1 auto !important;
+        min-width: 120px !important;
+        justify-content: center !important;
+    }
+
+    /* === MODALS === */
+    .modal-content {
+        padding: 1.5rem !important;
+        border-radius: var(--border-radius-sm) !important;
+    }
+
+    .modal-actions {
+        flex-direction: column !important;
+    }
+
+    .modal-actions .btn {
+        width: 100% !important;
+        justify-content: center !important;
+    }
+
+    /* === SIDEBAR PANEL === */
+    .sidebar-panel {
+        padding: 1.25rem !important;
+        gap: 1rem !important;
+    }
+
+    /* === AI CHAT === */
+    .ai-chat-messages {
+        max-height: 220px !important;
+    }
+
+    .chat-bubble {
+        max-width: 95% !important;
+    }
+
+    /* === WEBCAM PROCTOR (shrink on mobile) === */
+    .webcam-container {
+        width: 72px !important;
+        height: 72px !important;
+        bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px)) !important;
+        right: 1rem !important;
+        border-radius: 50% !important;
+    }
+
+    .webcam-feed {
+        width: 100% !important;
+        height: 100% !important;
+        border-radius: 50% !important;
+    }
+
+    .webcam-indicator-bar,
+    .webcam-scanline {
+        display: none !important;
+    }
+}
+
+
+/* ---- 600px: Phones ---- */
+@media (max-width: 600px) {
+
+    /* === HEADER: shrink user badge to icon only === */
+    .user-info-badge span {
+        display: none;
+    }
+
+    .user-info-badge {
+        padding: 0.5rem !important;
+        width: 38px;
+        justify-content: center;
+    }
+
+    .app-header {
+        padding: 0.75rem 4%;
+    }
+
+    /* === AUTH CARD === */
+    .auth-wrapper {
+        padding: 1rem !important;
+        align-items: flex-start !important;
+        padding-top: 2rem !important;
+    }
+
+    .auth-card {
+        padding: 1.75rem 1.25rem !important;
+        border-radius: var(--border-radius-md) !important;
+    }
+
+    .auth-logo {
+        font-size: 1.75rem !important;
+    }
+
+    .auth-logo-img {
+        height: 40px !important;
+        width: 40px !important;
+    }
+
+    .auth-sub {
+        font-size: 0.85rem !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    /* === BUTTONS (min touch target 44px) === */
+    .btn {
+        min-height: 44px;
+        padding: 0.7rem 1.2rem;
+        font-size: 0.9rem;
+    }
+
+    /* === DASHBOARD STATS: keep 2-col on phones === */
+    .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+
+    /* === SECTION TITLE === */
+    .section-title {
+        font-size: 1.05rem;
+    }
+
+    /* === TEST CARD === */
+    .test-card {
+        padding: 1rem;
+    }
+
+    .test-card h3 {
+        font-size: 1rem;
+    }
+
+    /* === FORM INPUTS === */
+    .input-control {
+        padding: 0.8rem 0.9rem;
+        font-size: 0.92rem;
+    }
+
+    .input-group label {
+        font-size: 0.82rem;
+    }
+
+    /* === PROFILE PAGE === */
+    .profile-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .profile-overview-pane {
+        position: static !important;
+    }
+
+    .profile-settings-pane {
+        max-height: none !important;
+        padding: 1.5rem 1rem !important;
+    }
+
+    .profile-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.5rem !important;
+    }
+
+    .profile-form-section-label {
+        font-size: 0.68rem;
+    }
+
+    /* === LEADERBOARD === */
+    .leaderboard-modal {
+        max-height: 95vh;
+        border-radius: var(--border-radius-sm);
+    }
+
+    .leaderboard-list {
+        padding: 0.75rem 1rem;
+        max-height: 320px;
+    }
+
+    .leaderboard-row {
+        padding: 0.6rem 0.5rem;
+        gap: 0.5rem;
+    }
+
+    /* === INSTRUCTION MODAL === */
+    .instruction-modal {
+        max-height: 96vh;
+        border-radius: var(--border-radius-sm);
+    }
+
+    .instruction-header,
+    .instruction-body {
+        padding: 1.25rem 1.25rem !important;
+    }
+
+    .instruction-modal .modal-actions {
+        padding: 0 1.25rem 1.25rem !important;
+        flex-direction: column;
+    }
+
+    /* === SCORE CARD / RESULTS === */
+    .results-breakdown-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+    }
+}
+
+
+/* ---- 400px: Tiny Phones (e.g. iPhone SE, Galaxy A series) ---- */
+@media (max-width: 400px) {
+
+    /* === HEADER: show only logo, hide brand name === */
+    .brand span {
+        display: none;
+    }
+
+    .brand {
+        gap: 0;
+    }
+
+    .brand-logo {
+        height: 28px;
+        width: 28px;
+    }
+
+    .nav-right {
+        gap: 0.45rem;
+    }
+
+    .theme-toggle,
+    .logout-btn {
+        width: 34px;
+        height: 34px;
+        font-size: 0.85rem;
+    }
+
+    /* === DASHBOARD === */
+    .dashboard-container {
+        padding: 1rem 3.5% !important;
+        gap: 1rem !important;
+    }
+
+    .welcome-banner {
+        padding: 1.1rem 1rem !important;
+    }
+
+    .welcome-banner h1 {
+        font-size: 1.25rem !important;
+    }
+
+    .welcome-banner p {
+        font-size: 0.82rem !important;
+    }
+
+    /* === STATS: keep 2-col even on tiny === */
+    .dashboard-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 0.6rem !important;
+    }
+
+    .stat-item {
+        padding: 0.75rem;
+        gap: 0.6rem;
+    }
+
+    .stat-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 0.85rem;
+    }
+
+    .stat-details h4 {
+        font-size: 1rem;
+    }
+
+    .stat-details p {
+        font-size: 0.72rem;
+    }
+
+    /* === ADMIN TABS: full-width each on tiny === */
+    .admin-tab-btn {
+        flex: 1 1 100% !important;
+    }
+
+    /* === AUTH === */
+    .auth-card {
+        padding: 1.5rem 1rem !important;
+    }
+
+    .auth-logo {
+        font-size: 1.5rem !important;
+    }
+
+    /* === TEST INTERFACE === */
+    .test-content-area {
+        padding: 1rem 3.5% !important;
+    }
+
+    .test-title-info h2 {
+        font-size: 1rem;
+    }
+
+    .test-header-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    /* === PROFILE === */
+    .profile-stat-val {
+        font-size: 1.15rem;
+    }
+
+    .profile-form-actions {
+        flex-direction: column;
+    }
+
+    /* === BUTTONS === */
+    .btn {
+        font-size: 0.85rem;
+        padding: 0.65rem 1rem;
+    }
+
+    /* === DEVELOPER CARD (FAB) === */
+    .dev-card {
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+        padding: 1.5rem 1.1rem !important;
+    }
+
+    .dev-toggle-btn {
+        width: 46px !important;
+        height: 46px !important;
+        right: 1rem !important;
+    }
+}
