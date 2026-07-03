@@ -249,18 +249,37 @@ export function renderAdminDashboard(user) {
         paneBuilder.innerHTML = `
             <!-- AI Conversational Agent Panel -->
             <div class="ai-generator-panel" style="border-style: solid;">
-                <div class="ai-panel-header" style="justify-content: space-between; display: flex; width: 100%;">
+                <div class="ai-panel-header" style="justify-content: space-between; display: flex; width: 100%; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
                     <div style="display: flex; align-items: center; gap: 0.75rem;">
                         <i class="fas fa-robot" style="animation: pulse-glow 2s infinite;"></i>
                         <h3>AI Conversational Agent Assistant</h3>
                     </div>
-                    <button class="btn btn-secondary" id="reset-chat-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-color: rgba(255,255,255,0.1);">
-                        <i class="fas fa-sync-alt"></i> Reset Chat
-                    </button>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <button class="btn btn-secondary" id="gemini-config-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem; border-color: rgba(6, 182, 212, 0.3); color: hsl(190, 90%, 50%);">
+                            <i class="fas fa-key"></i> Gemini API Key
+                        </button>
+                        <button class="btn btn-secondary" id="reset-chat-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-color: rgba(255,255,255,0.1);">
+                            <i class="fas fa-sync-alt"></i> Reset Chat
+                        </button>
+                    </div>
                 </div>
                 <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: -0.75rem; line-height: 1.5;">
                     Chat with the AI Agent below to generate dynamic questions. Specify a topic, formats (multiple choice, checkbox, code tasks), or count, and review proposed outputs.
                 </p>
+
+                <!-- Sleek collapsible API Key setting panel -->
+                <div id="gemini-key-panel" style="display: none; background: rgba(255,255,255,0.02); border: 1px dashed var(--border-color); padding: 1rem; border-radius: 8px; margin: 0.5rem 0 1rem 0; gap: 0.5rem; flex-direction: column;">
+                    <label style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.25rem;">
+                        Enter your <strong>Gemini API Key</strong> for smarter parsing / generation via Gemini 1.5 Flash:
+                    </label>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <input type="password" id="gemini-api-key-input" class="input-control" placeholder="AIzaSy..." style="flex: 1; font-size: 0.8rem; padding: 0.4rem 0.75rem;">
+                        <button class="btn btn-primary" id="save-gemini-key-btn" style="padding: 0.4rem 1rem; font-size: 0.8rem;">Save</button>
+                    </div>
+                    <span style="font-size: 0.7rem; color: var(--text-muted);">
+                        Key is saved locally in your browser's LocalStorage and is never sent to any server other than Google's Gemini API.
+                    </span>
+                </div>
                 
                 <!-- Chat Window Container -->
                 <div class="ai-chat-container">
@@ -424,14 +443,128 @@ export function renderAdminDashboard(user) {
         // Initialize sub-renderers
         renderBuilderSections();
 
+        // Collapsible Gemini panel triggers
+        const configBtn = paneBuilder.querySelector("#gemini-config-btn");
+        const keyPanel = paneBuilder.querySelector("#gemini-key-panel");
+        const keyInput = paneBuilder.querySelector("#gemini-api-key-input");
+        const saveKeyBtn = paneBuilder.querySelector("#save-gemini-key-btn");
+
+        // Load existing key
+        const savedKey = localStorage.getItem("testabhi_gemini_key") || '';
+        if (savedKey) {
+            keyInput.value = savedKey;
+        }
+
+        configBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            if (keyPanel.style.display === "none" || !keyPanel.style.display) {
+                keyPanel.style.display = "flex";
+            } else {
+                keyPanel.style.display = "none";
+            }
+        });
+
+        saveKeyBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            const val = keyInput.value.trim();
+            if (val) {
+                localStorage.setItem("testabhi_gemini_key", val);
+                showToast("Gemini API Key saved locally!", "success");
+            } else {
+                localStorage.removeItem("testabhi_gemini_key");
+                showToast("Gemini API Key removed.", "info");
+            }
+            keyPanel.style.display = "none";
+        });
+
         // Chat Interface Elements
         const chatInput = paneBuilder.querySelector("#ai-chat-input");
         const chatSendBtn = paneBuilder.querySelector("#ai-chat-send-btn");
         const resetChatBtn = paneBuilder.querySelector("#reset-chat-btn");
         const loadDraftsBtn = paneBuilder.querySelector("#ai-load-drafts-btn");
 
+        const processLocalLogic = (userText) => {
+            let reply = '';
+            const lower = userText.toLowerCase();
+
+            // Try local parsing
+            const parsed = parseRawQuestions(userText);
+            if (parsed.questions.length > 0) {
+                proposedQuestionsList = parsed.questions;
+                proposedSectionsList = parsed.sections;
+                chatTopic = "Custom Pasted Assessment";
+                chatCount = parsed.questions.length;
+                chatPhase = 2; // Finalized state ready to load
+                
+                reply = `I detected a list of raw questions! I have successfully parsed **${parsed.questions.length}** questions${parsed.sections.length > 0 ? ` across **${parsed.sections.length}** sections` : ''} from your copy-pasted text.\n\n`;
+                
+                if (parsed.sections.length > 0) {
+                    reply += `**Parsed Sections:**\n` + 
+                        parsed.sections.map(s => `- **${s.name}**: ${s.duration} minutes (${parsed.questions.filter(q => q.sectionName === s.name).length} questions)`).join('\n') + `\n\n`;
+                }
+                
+                reply += `**Questions Structured:**\n` +
+                    parsed.questions.map((q, idx) => {
+                        const ansLabel = q.type === 'multi' 
+                            ? (q.answers || []).map(a => String.fromCharCode(65 + a)).join(', ') 
+                            : (typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : q.answer);
+                        return `${idx + 1}. [${q.type.toUpperCase()}] ${q.text} (Section: *${q.sectionName}*, Answer: ${ansLabel})`;
+                    }).join('\n') +
+                    `\n\n💡 **Tip:** Set a **Gemini API Key** via the cyan button above for 100% accurate, error-free parsing of messy text formats!\n\nClick the **Load Proposed Questions into Editor** button below to sync them to the Verification Panel so you can manually check and publish the assessment!`;
+                
+                chatHistory.push({ sender: 'agent', text: reply });
+                return;
+            }
+
+            // Standard Dialog Tree
+            if (chatPhase === 0) {
+                chatTopic = userText;
+                chatPhase = 1;
+                reply = `Awesome choice: **${chatTopic}**! Let's configure the structure.\n\nShould we include **Multiple Choice** questions, **Multiple Response** (checkmarks), **JavaScript Coding Tasks**, or a **Mixed Format** (a blend of everything)?`;
+            } else if (chatPhase === 1) {
+                if (lower.includes("code") || lower.includes("coding") || lower.includes("task")) {
+                    chatFormat = 'code';
+                } else if (lower.includes("multi") || lower.includes("response") || lower.includes("check")) {
+                    chatFormat = 'multi';
+                } else if (lower.includes("single") || lower.includes("radio") || lower.includes("choice")) {
+                    chatFormat = 'single';
+                } else {
+                    chatFormat = 'mix';
+                }
+
+                proposedQuestionsList = generateMockQuestions(chatTopic, chatCount, chatFormat);
+                chatPhase = 2;
+
+                reply = `I have successfully drafted a **${chatFormat.toUpperCase()}** format exam on **${chatTopic}** with **${chatCount}** questions!\n\nHere is a quick summary of the generated items:\n` +
+                    proposedQuestionsList.map((q, idx) => `${idx + 1}. [${q.type.toUpperCase()}] ${q.text.slice(0, 60)}...`).join('\n') +
+                    `\n\nTo load these into the editor workspace, click the **Load Proposed Questions into Editor** button below! You can also tell me to "change count to 5" or "make it coding only" to refine it.`;
+            } else {
+                const numMatch = lower.match(/\b([1-9]|10)\b/);
+                if (numMatch) {
+                    chatCount = parseInt(numMatch[0], 10);
+                }
+                if (lower.includes("code") || lower.includes("coding")) {
+                    chatFormat = 'code';
+                } else if (lower.includes("multi") || lower.includes("checkbox")) {
+                    chatFormat = 'multi';
+                } else if (lower.includes("single") || lower.includes("radio") || lower.includes("choice")) {
+                    chatFormat = 'single';
+                } else if (lower.includes("mixed") || lower.includes("mix")) {
+                    chatFormat = 'mix';
+                }
+
+                proposedQuestionsList = generateMockQuestions(chatTopic, chatCount, chatFormat);
+
+                reply = `I've updated the draft according to your adjustments (Count: **${chatCount}**, Format: **${chatFormat.toUpperCase()}**).\n\nHere is the updated draft summary:\n` +
+                    proposedQuestionsList.map((q, idx) => `${idx + 1}. [${q.type.toUpperCase()}] ${q.text.slice(0, 60)}...`).join('\n') +
+                    `\n\nClick the load button below to sync with the verification panel!`;
+            }
+
+            chatHistory.push({ sender: 'agent', text: reply });
+        };
+
         // Send handles
-        const handleSend = () => {
+        const handleSend = async () => {
             const userText = chatInput.value.trim();
             if (!userText) return;
 
@@ -440,101 +573,46 @@ export function renderAdminDashboard(user) {
             chatInput.value = '';
             renderChatMessages();
 
-            // 2. Simulated typing indicator
+            // 2. Typing indicator
             chatHistory.push({ sender: 'agent', isTyping: true });
             renderChatMessages();
 
-            // 3. Process dialogue logic
-            setTimeout(() => {
-                // Remove typing bubble
-                chatHistory = chatHistory.filter(m => !m.isTyping);
+            const apiKey = localStorage.getItem("testabhi_gemini_key");
 
-                let reply = '';
-                const lower = userText.toLowerCase();
+            if (apiKey) {
+                try {
+                    const geminiResponse = await callGeminiAPI(apiKey, userText);
+                    chatHistory = chatHistory.filter(m => !m.isTyping);
 
-                // High-priority check: Try parsing the copy-pasted input directly. If it yields valid questions, use them!
-                const parsed = parseRawQuestions(userText);
-                if (parsed.questions.length > 0) {
-                    proposedQuestionsList = parsed.questions;
-                    proposedSectionsList = parsed.sections;
-                    chatTopic = "Custom Pasted Assessment";
-                    chatCount = parsed.questions.length;
-                    chatPhase = 2; // Finalized state ready to load
-                    
-                    let reply = `I detected a list of raw questions! I have successfully parsed **${parsed.questions.length}** questions${parsed.sections.length > 0 ? ` across **${parsed.sections.length}** sections` : ''} from your copy-pasted text.\n\n`;
-                    
-                    if (parsed.sections.length > 0) {
-                        reply += `**Parsed Sections:**\n` + 
-                            parsed.sections.map(s => `- **${s.name}**: ${s.duration} minutes (${parsed.questions.filter(q => q.sectionName === s.name).length} questions)`).join('\n') + `\n\n`;
-                    }
-                    
-                    reply += `**Questions Structured:**\n` +
-                        parsed.questions.map((q, idx) => {
-                            const ansLabel = q.type === 'multi' 
-                                ? (q.answers || []).map(a => String.fromCharCode(65 + a)).join(', ') 
-                                : (typeof q.answer === 'number' ? String.fromCharCode(65 + q.answer) : q.answer);
-                            return `${idx + 1}. [${q.type.toUpperCase()}] ${q.text} (Section: *${q.sectionName}*, Answer: ${ansLabel})`;
-                        }).join('\n') +
-                        `\n\nClick the **Load Proposed Questions into Editor** button below to sync them to the Verification Panel so you can manually check and publish the assessment!`;
-                    
-                    chatHistory.push({ sender: 'agent', text: reply });
-                    renderChatMessages();
-                    return;
-                }
+                    if (geminiResponse && Array.isArray(geminiResponse.questions)) {
+                        proposedQuestionsList = geminiResponse.questions;
+                        proposedSectionsList = geminiResponse.sections || [];
+                        chatTopic = geminiResponse.chatTopic || "Gemini Generated Test";
+                        chatCount = geminiResponse.questions.length;
+                        chatPhase = 2; // ready
 
-                if (chatPhase === 0) {
-                    // Set topic
-                    chatTopic = userText;
-                    chatPhase = 1;
-                    reply = `Awesome choice: **${chatTopic}**! Let's configure the structure.\n\nShould we include **Multiple Choice** questions, **Multiple Response** (checkmarks), **JavaScript Coding Tasks**, or a **Mixed Format** (a blend of everything)?`;
-                } else if (chatPhase === 1) {
-                    // Set format
-                    if (lower.includes("code") || lower.includes("coding") || lower.includes("task")) {
-                        chatFormat = 'code';
-                    } else if (lower.includes("multi") || lower.includes("response") || lower.includes("check")) {
-                        chatFormat = 'multi';
-                    } else if (lower.includes("single") || lower.includes("radio") || lower.includes("choice")) {
-                        chatFormat = 'single';
+                        chatHistory.push({ sender: 'agent', text: geminiResponse.reply || "Questions successfully generated/parsed by Gemini API!" });
                     } else {
-                        chatFormat = 'mix';
+                        throw new Error("Invalid structure returned by Gemini.");
                     }
-
-                    // Generate proposed questions
-                    proposedQuestionsList = generateMockQuestions(chatTopic, chatCount, chatFormat);
-                    chatPhase = 2;
-
-                    reply = `I have successfully drafted a **${chatFormat.toUpperCase()}** format exam on **${chatTopic}** with **${chatCount}** questions!\n\nHere is a quick summary of the generated items:\n` +
-                        proposedQuestionsList.map((q, idx) => `${idx + 1}. [${q.type.toUpperCase()}] ${q.text.slice(0, 60)}...`).join('\n') +
-                        `\n\nTo load these into the editor workspace, click the **Load Proposed Questions into Editor** button below! You can also tell me to "change count to 5" or "make it coding only" to refine it.`;
-                } else {
-                    // Adjustments in phase 2
-                    // Parse counts
-                    const numMatch = lower.match(/\b([1-9]|10)\b/);
-                    if (numMatch) {
-                        chatCount = parseInt(numMatch[0], 10);
-                    }
-                    // Parse format
-                    if (lower.includes("code") || lower.includes("coding")) {
-                        chatFormat = 'code';
-                    } else if (lower.includes("multi") || lower.includes("checkbox")) {
-                        chatFormat = 'multi';
-                    } else if (lower.includes("single") || lower.includes("radio") || lower.includes("choice")) {
-                        chatFormat = 'single';
-                    } else if (lower.includes("mixed") || lower.includes("mix")) {
-                        chatFormat = 'mix';
-                    }
-
-                    // Re-generate
-                    proposedQuestionsList = generateMockQuestions(chatTopic, chatCount, chatFormat);
-
-                    reply = `I've updated the draft according to your adjustments (Count: **${chatCount}**, Format: **${chatFormat.toUpperCase()}**).\n\nHere is the updated draft summary:\n` +
-                        proposedQuestionsList.map((q, idx) => `${idx + 1}. [${q.type.toUpperCase()}] ${q.text.slice(0, 60)}...`).join('\n') +
-                        `\n\nClick the load button below to sync with the verification panel!`;
+                } catch (err) {
+                    console.error("Gemini API Error: ", err);
+                    chatHistory = chatHistory.filter(m => !m.isTyping);
+                    chatHistory.push({ 
+                        sender: 'agent', 
+                        text: `⚠️ **Gemini API Error:** ${err.message}\n\n*Falling back to local parsing engine...*` 
+                    });
+                    processLocalLogic(userText);
                 }
-
-                chatHistory.push({ sender: 'agent', text: reply });
                 renderChatMessages();
-            }, 1200);
+            } else {
+                // Local Fallback simulation
+                setTimeout(() => {
+                    chatHistory = chatHistory.filter(m => !m.isTyping);
+                    processLocalLogic(userText);
+                    renderChatMessages();
+                }, 1200);
+            }
         };
 
         chatSendBtn.addEventListener("click", (e) => {
@@ -1575,4 +1653,77 @@ export function renderAdminDashboard(user) {
     renderAnalytics();
 
     return container;
+}
+
+// -------------------------------------------------------------
+// Call Google Gemini API to parse or generate questions
+// -------------------------------------------------------------
+async function callGeminiAPI(apiKey, promptText) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    
+    const systemInstruction = `You are a helpful AI Assessment Agent for TestAbhi.
+Your task is to parse copy-pasted exam questions or generate new questions based on the user's prompt.
+Analyze the user's text and extract or generate the questions correctly. Fix spelling, capitalization, and formatting anomalies where possible.
+You must output a single valid JSON object. Do NOT wrap it in markdown code blocks like \`\`\`json. Just output raw JSON.
+The JSON structure must match this EXACT schema:
+{
+  "reply": "Friendly response summary detailing how many questions you parsed or generated",
+  "chatTopic": "The subject/topic of the exam",
+  "questions": [
+    {
+      "text": "The question body",
+      "type": "single" | "multi" | "text" | "code",
+      "options": ["Option A", "Option B", "Option C", "Option D"], // Only for single/multi
+      "answer": 0, // 0-indexed number of the correct option for 'single'. Or the correct answer string for 'text'.
+      "answers": [0, 2], // Array of 0-indexed numbers of correct options for 'multi' (ONLY if type is 'multi')
+      "explanation": "Why this is correct",
+      "sectionName": "Name of the section (e.g. General, Math, coding)",
+      "template": "function template() {}", // ONLY if type is 'code'
+      "assertions": [{"input": [args], "expected": "output"}] // ONLY if type is 'code'
+    }
+  ],
+  "sections": [
+    {
+      "name": "Section Name",
+      "duration": 10
+    }
+  ]
+}`;
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contents: [
+                {
+                    parts: [
+                        { text: promptText }
+                    ]
+                }
+            ],
+            systemInstruction: {
+                parts: [
+                    { text: systemInstruction }
+                ]
+            },
+            generationConfig: {
+                responseMimeType: "application/json"
+            }
+        })
+    });
+
+    if (!response.ok) {
+        throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textResponse) {
+        throw new Error("Invalid or empty response from Gemini API.");
+    }
+
+    // Try to parse JSON
+    return JSON.parse(textResponse.trim());
 }
