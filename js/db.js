@@ -580,7 +580,7 @@ export async function registerUser(username, password, name, role) {
     return { success: true, message: successMsg };
 }
 
-export async function updateUserProfile(username, newName, newPassword) {
+export async function updateUserProfile(username, newName, newPassword, extras = {}) {
     const cleanUsername = username.toLowerCase().trim();
     const userRef = doc(db, 'users', cleanUsername);
     const userSnap = await getDoc(userRef);
@@ -589,6 +589,13 @@ export async function updateUserProfile(username, newName, newPassword) {
         const userData = userSnap.data();
         if (newName) userData.name = newName.trim();
         if (newPassword) userData.password = newPassword;
+
+        // Persist extended profile fields
+        const extendedFields = ['bio', 'phone', 'college', 'department', 'year', 'specialization', 'profilePhoto'];
+        extendedFields.forEach(field => {
+            if (field in extras) userData[field] = extras[field];
+        });
+
         cache.users[cleanUsername] = userData;
         await setDoc(userRef, userData);
         return { success: true, message: "Profile updated successfully!" };

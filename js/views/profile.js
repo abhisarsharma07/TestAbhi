@@ -1,3 +1,8 @@
+/* -------------------------------------------------------------
+   TestAbhi - Enhanced User Profile View
+   Features: Photo upload, Extended Details, Richer Stats
+------------------------------------------------------------- */
+
 import { updateUserProfile, getTests, fetchAllUsers } from '../db.js';
 import { showToast } from '../utils.js';
 import { navigate } from '../app.js';
@@ -7,126 +12,260 @@ export function renderProfileView(user) {
     container.className = "dashboard-container fade-in";
 
     const tests = getTests();
-    const currentUserData = user;
 
     let roleDescription = "";
+    let roleIcon = "fa-user";
     let statsHtml = "";
 
+    // ---- Role-specific Stats ----
     if (user.role === 'student') {
         roleDescription = "Student Portal Candidate";
-        const taken = currentUserData.history || [];
-        const avgScore = taken.length > 0 
-            ? Math.round(taken.reduce((sum, item) => sum + item.score, 0) / taken.length) 
+        roleIcon = "fa-user-graduate";
+
+        const taken = user.history || [];
+        const avgScore = taken.length > 0
+            ? Math.round(taken.reduce((sum, h) => sum + h.score, 0) / taken.length)
             : 0;
+        const bestScore  = taken.length > 0 ? Math.max(...taken.map(h => h.score)) : 0;
+        const worstScore = taken.length > 0 ? Math.min(...taken.map(h => h.score)) : 0;
 
         statsHtml = `
             <div class="profile-stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" style="color: hsl(190, 90%, 50%);">${taken.length}</div>
-                    <div class="stat-label">Exams Taken</div>
+                <div class="profile-stat-chip" style="--chip-color: hsl(190, 90%, 50%);">
+                    <span class="profile-stat-val">${taken.length}</span>
+                    <span class="profile-stat-lbl">Exams Taken</span>
                 </div>
-                <div class="stat-card">
-                    <div class="stat-value" style="color: hsl(142, 70%, 45%);">${avgScore}%</div>
-                    <div class="stat-label">Average Score</div>
+                <div class="profile-stat-chip" style="--chip-color: hsl(142, 70%, 45%);">
+                    <span class="profile-stat-val">${avgScore}%</span>
+                    <span class="profile-stat-lbl">Avg Score</span>
+                </div>
+                <div class="profile-stat-chip" style="--chip-color: hsl(263, 90%, 65%);">
+                    <span class="profile-stat-val">${bestScore}%</span>
+                    <span class="profile-stat-lbl">Best Score</span>
+                </div>
+                <div class="profile-stat-chip" style="--chip-color: hsl(355, 78%, 56%);">
+                    <span class="profile-stat-val">${worstScore > 0 ? worstScore + '%' : '—'}</span>
+                    <span class="profile-stat-lbl">Lowest Score</span>
                 </div>
             </div>
         `;
+
     } else if (user.role === 'faculty') {
         roleDescription = "Academic Faculty Member";
+        roleIcon = "fa-user-tie";
+
         statsHtml = `
             <div class="profile-stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" style="color: hsl(263, 90%, 65%);">${tests.length}</div>
-                    <div class="stat-label">Total Test Bank Collections</div>
-                </div>
-            </div>
-        `;
-    } else {
-        roleDescription = "System Super Administrator";
-        statsHtml = `
-            <div id="admin-profile-stats" class="profile-stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value" style="color: hsl(355, 78%, 56%); font-size: 1.25rem;"><i class="fas fa-spinner fa-spin"></i></div>
-                    <div class="stat-label">Loading accounts count...</div>
+                <div class="profile-stat-chip" style="--chip-color: hsl(263, 90%, 65%);">
+                    <span class="profile-stat-val">${tests.length}</span>
+                    <span class="profile-stat-lbl">Test Collections</span>
                 </div>
             </div>
         `;
 
-        // Async load admin stats
+    } else {
+        roleDescription = "System Super Administrator";
+        roleIcon = "fa-user-shield";
+
+        statsHtml = `
+            <div id="admin-profile-stats" class="profile-stats-grid">
+                <div class="profile-stat-chip" style="--chip-color: hsl(355, 78%, 56%);">
+                    <span class="profile-stat-val"><i class="fas fa-spinner fa-spin"></i></span>
+                    <span class="profile-stat-lbl">Total Accounts</span>
+                </div>
+            </div>
+        `;
         setTimeout(async () => {
             try {
                 const users = await fetchAllUsers();
-                const totalUsers = Object.keys(users).length;
                 const statsBox = container.querySelector("#admin-profile-stats");
                 if (statsBox) {
                     statsBox.innerHTML = `
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: hsl(355, 78%, 56%);">${totalUsers}</div>
-                            <div class="stat-label">Total Registered Accounts</div>
+                        <div class="profile-stat-chip" style="--chip-color: hsl(355, 78%, 56%);">
+                            <span class="profile-stat-val">${Object.keys(users).length}</span>
+                            <span class="profile-stat-lbl">Total Accounts</span>
                         </div>
                     `;
                 }
-            } catch (err) {
-                const statsBox = container.querySelector("#admin-profile-stats");
-                if (statsBox) {
-                    statsBox.innerHTML = `
-                        <div class="stat-card">
-                            <div class="stat-value" style="color: hsl(0, 85%, 60%); font-size: 1.2rem;">Error</div>
-                            <div class="stat-label">Could not load stats</div>
-                        </div>
-                    `;
-                }
-            }
+            } catch { /* fail silently */ }
         }, 50);
     }
 
+    // ---- Helper: info chip row (only renders if value exists) ----
+    const infoChip = (icon, label, value) =>
+        value ? `<div class="profile-info-chip">
+                    <i class="fas ${icon} pic-icon"></i>
+                    <div class="pic-text">
+                        <span class="pic-label">${label}</span>
+                        <span class="pic-value">${value}</span>
+                    </div>
+                 </div>` : '';
 
+    // ---- Build detail chips from saved data ----
+    const detailChips = [
+        infoChip('fa-at',          'Username',       `@${user.username}`),
+        infoChip('fa-quote-left',  'Bio',            user.bio),
+        infoChip('fa-phone',       'Phone',          user.phone),
+        infoChip('fa-university',  'College',        user.college),
+        infoChip('fa-sitemap',     'Department',     user.department),
+        user.role === 'student' ? infoChip('fa-layer-group', 'Year of Study', user.year) : '',
+        user.role === 'faculty' ? infoChip('fa-book-open',   'Specialization', user.specialization) : '',
+    ].join('');
+
+    // ---- Avatar: real photo or icon fallback ----
+    const avatarInner = user.profilePhoto
+        ? `<img src="${user.profilePhoto}" alt="Profile Photo" class="profile-avatar-img">`
+        : `<div class="profile-avatar-icon-wrap"><i class="fas ${roleIcon}"></i></div>`;
+
+    // ---- Role-conditional extra form fields ----
+    const studentFields = user.role === 'student' ? `
+        <div class="input-group">
+            <label for="profile-year"><i class="fas fa-layer-group"></i> Year of Study <span class="optional-tag">optional</span></label>
+            <select id="profile-year" class="input-control">
+                <option value="">Select Year</option>
+                <option value="1st Year"  ${user.year === '1st Year'  ? 'selected' : ''}>1st Year</option>
+                <option value="2nd Year"  ${user.year === '2nd Year'  ? 'selected' : ''}>2nd Year</option>
+                <option value="3rd Year"  ${user.year === '3rd Year'  ? 'selected' : ''}>3rd Year</option>
+                <option value="4th Year"  ${user.year === '4th Year'  ? 'selected' : ''}>4th Year</option>
+                <option value="Graduate"  ${user.year === 'Graduate'  ? 'selected' : ''}>Graduate</option>
+            </select>
+        </div>` : '';
+
+    const facultyFields = user.role === 'faculty' ? `
+        <div class="input-group">
+            <label for="profile-specialization"><i class="fas fa-book-open"></i> Specialization / Subject <span class="optional-tag">optional</span></label>
+            <input type="text" id="profile-specialization" class="input-control"
+                placeholder="e.g. Data Structures & Algorithms"
+                value="${user.specialization || ''}">
+        </div>` : '';
+
+    // ---- Render HTML ----
     container.innerHTML = `
         <div class="welcome-banner">
-            <h1>User Profile</h1>
-            <p>View your credentials, overview stats, and update settings.</p>
+            <h1><i class="fas fa-id-card"></i> My Profile</h1>
+            <p>Manage your photo, personal info, and account settings.</p>
         </div>
 
-        <div class="code-split-container" style="margin-top: 1rem;">
-            <!-- Left Pane: Profile Overview -->
-            <div class="code-instructions-pane" style="background-color: var(--bg-card); border: var(--glass-border); padding: 2rem; border-radius: var(--border-radius-md); display: flex; flex-direction: column; align-items: center; text-align: center;">
-                <div style="width: 100px; height: 100px; border-radius: 50%; background: var(--secondary-gradient); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; box-shadow: 0 4px 15px var(--primary-glow);">
-                    <i class="fas ${user.role === 'admin' ? 'fa-user-shield' : (user.role === 'faculty' ? 'fa-user-tie' : 'fa-user-graduate')}" style="font-size: 3rem; color: white;"></i>
+        <div class="profile-grid">
+
+            <!-- ===== LEFT: Overview Pane ===== -->
+            <div class="profile-overview-pane">
+
+                <!-- Avatar Upload -->
+                <div class="profile-avatar-wrap" id="avatar-wrap" title="Click to upload a photo">
+                    <div class="profile-avatar-ring">
+                        ${avatarInner}
+                    </div>
+                    <div class="avatar-overlay">
+                        <i class="fas fa-camera"></i>
+                        <span>Change Photo</span>
+                    </div>
+                    <input type="file" id="avatar-file-input" accept="image/*" style="display:none;">
                 </div>
-                
-                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary);">${currentUserData.name}</h2>
-                <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.25rem;">@${user.username}</p>
-                
-                <span class="test-badge" style="background-color: var(--primary-glow); border: 1px solid rgba(99, 102, 241, 0.3); font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 50px; color: var(--text-primary); margin-top: 0.5rem; font-weight: 600;">
-                    ${roleDescription}
+
+                <!-- Identity -->
+                <h2 class="profile-display-name">${user.name}</h2>
+                <p class="profile-username">@${user.username}</p>
+                <span class="profile-role-badge">
+                    <i class="fas ${roleIcon}"></i> ${roleDescription}
                 </span>
 
-                <div style="border-top: 1px solid var(--border-color); width: 100%; margin-top: 1.5rem; padding-top: 1rem;">
-                    <strong style="font-size: 0.85rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">Performance Overview</strong>
+                <!-- Detail Chips -->
+                <div class="profile-info-section">
+                    ${detailChips || '<p class="profile-empty-hint"><i class="fas fa-pen"></i> Add your details in Settings →</p>'}
+                </div>
+
+                <!-- Stats -->
+                <div class="profile-stats-section">
+                    <div class="profile-stats-title">
+                        <i class="fas fa-chart-bar"></i> Performance Overview
+                    </div>
                     ${statsHtml}
                 </div>
             </div>
 
-            <!-- Right Pane: Edit Credentials Form -->
-            <div class="code-editor-pane" style="background-color: var(--bg-card); border: var(--glass-border); padding: 2.5rem; border-radius: var(--border-radius-md);">
-                <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);"><i class="fas fa-cog"></i> Account Settings</h3>
-                
-                <form id="profile-settings-form" style="display: flex; flex-direction: column; gap: 1.25rem;">
-                    <div class="input-group">
-                        <label for="profile-name">Display Name</label>
-                        <input type="text" id="profile-name" class="input-control" value="${currentUserData.name}" required>
+            <!-- ===== RIGHT: Settings Form ===== -->
+            <div class="profile-settings-pane">
+                <h3 class="profile-settings-title">
+                    <i class="fas fa-sliders-h"></i> Account Settings
+                </h3>
+
+                <form id="profile-settings-form">
+
+                    <!-- Basic Info -->
+                    <div class="profile-form-section">
+                        <div class="profile-form-section-label">Basic Info</div>
+
+                        <div class="input-group">
+                            <label for="profile-name"><i class="fas fa-user"></i> Display Name</label>
+                            <input type="text" id="profile-name" class="input-control" value="${user.name}" required>
+                        </div>
+
+                        <div class="input-group">
+                            <label for="profile-bio">
+                                <i class="fas fa-quote-left"></i> Bio
+                                <span class="optional-tag">optional</span>
+                            </label>
+                            <textarea id="profile-bio" class="input-control profile-textarea" rows="3"
+                                placeholder="Tell something about yourself...">${user.bio || ''}</textarea>
+                        </div>
                     </div>
 
-                    <div class="input-group">
-                        <label for="profile-password">Update Password</label>
-                        <input type="password" id="profile-password" class="input-control" placeholder="Leave empty to keep current password" autocomplete="new-password">
+                    <!-- Contact & Education -->
+                    <div class="profile-form-section">
+                        <div class="profile-form-section-label">Contact &amp; Education</div>
+
+                        <div class="input-group">
+                            <label for="profile-phone">
+                                <i class="fas fa-phone"></i> Phone
+                                <span class="optional-tag">optional</span>
+                            </label>
+                            <input type="tel" id="profile-phone" class="input-control"
+                                placeholder="e.g. +91 98765 43210" value="${user.phone || ''}">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="profile-college">
+                                <i class="fas fa-university"></i> College / Institution
+                                <span class="optional-tag">optional</span>
+                            </label>
+                            <input type="text" id="profile-college" class="input-control"
+                                placeholder="e.g. JECRC College, Jaipur" value="${user.college || ''}">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="profile-department">
+                                <i class="fas fa-sitemap"></i> Branch / Department
+                                <span class="optional-tag">optional</span>
+                            </label>
+                            <input type="text" id="profile-department" class="input-control"
+                                placeholder="e.g. Computer Science & Engineering" value="${user.department || ''}">
+                        </div>
+
+                        ${studentFields}
+                        ${facultyFields}
                     </div>
 
-                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-                        <button type="button" class="btn btn-secondary" id="profile-back-btn" style="flex: 1; justify-content: center;">
+                    <!-- Security -->
+                    <div class="profile-form-section">
+                        <div class="profile-form-section-label">Security</div>
+
+                        <div class="input-group">
+                            <label for="profile-password">
+                                <i class="fas fa-lock"></i> Update Password
+                                <span class="optional-tag">leave blank to keep current</span>
+                            </label>
+                            <input type="password" id="profile-password" class="input-control"
+                                placeholder="••••••••" autocomplete="new-password">
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="profile-form-actions">
+                        <button type="button" class="btn btn-secondary" id="profile-back-btn">
                             <i class="fas fa-arrow-left"></i> Dashboard
                         </button>
-                        <button type="submit" class="btn btn-primary" style="flex: 1; justify-content: center;">
+                        <button type="submit" class="btn btn-primary" id="profile-save-btn">
                             Save Changes <i class="fas fa-save"></i>
                         </button>
                     </div>
@@ -135,53 +274,88 @@ export function renderProfileView(user) {
         </div>
     `;
 
-    const form = container.querySelector("#profile-settings-form");
-    const nameInput = container.querySelector("#profile-name");
-    const passwordInput = container.querySelector("#profile-password");
+    // ---- Wire: Avatar Upload ----
+    const avatarWrap      = container.querySelector("#avatar-wrap");
+    const avatarFileInput = container.querySelector("#avatar-file-input");
+    const avatarRing      = container.querySelector(".profile-avatar-ring");
+
+    avatarWrap.addEventListener("click", () => avatarFileInput.click());
+
+    avatarFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            showToast("Photo must be under 2 MB. Please choose a smaller image.", "error");
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+            avatarRing.innerHTML = `<img src="${ev.target.result}" alt="Profile Photo" class="profile-avatar-img">`;
+            user._pendingPhoto = ev.target.result;
+            showToast("Photo ready — click Save Changes to apply. 📸", "info");
+        };
+        reader.readAsDataURL(file);
+    });
+
+    // ---- Wire: Save Form ----
+    const form    = container.querySelector("#profile-settings-form");
+    const saveBtn = container.querySelector("#profile-save-btn");
 
     form.addEventListener("submit", async (e) => {
         e.preventDefault();
-        const submitBtn = form.querySelector("[type='submit']");
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
 
-        const updatedName = nameInput.value.trim();
-        const updatedPassword = passwordInput.value;
+        const newName     = container.querySelector("#profile-name").value.trim();
+        const newPassword = container.querySelector("#profile-password").value;
 
-        const res = await updateUserProfile(user.username, updatedName, updatedPassword || null);
+        const extras = {
+            bio:        container.querySelector("#profile-bio").value.trim(),
+            phone:      container.querySelector("#profile-phone").value.trim(),
+            college:    container.querySelector("#profile-college").value.trim(),
+            department: container.querySelector("#profile-department").value.trim(),
+        };
+
+        if (user.role === 'student') {
+            extras.year = container.querySelector("#profile-year")?.value || '';
+        }
+        if (user.role === 'faculty') {
+            extras.specialization = container.querySelector("#profile-specialization")?.value.trim() || '';
+        }
+        if (user._pendingPhoto) {
+            extras.profilePhoto = user._pendingPhoto;
+        }
+
+        const res = await updateUserProfile(user.username, newName, newPassword || null, extras);
+
         if (res.success) {
-            showToast(res.message, "success");
-            // Update active session data name
-            user.name = updatedName;
+            Object.assign(user, { name: newName, ...extras });
+            if (user._pendingPhoto) {
+                user.profilePhoto = user._pendingPhoto;
+                delete user._pendingPhoto;
+            }
             sessionStorage.setItem("testabhi_session", JSON.stringify(user));
-            
-            // Redirect back to dashboard based on role
+            showToast("Profile updated successfully! 🎉", "success");
+
             setTimeout(() => {
-                if (user.role === 'admin') {
-                    navigate('super-admin');
-                } else if (user.role === 'faculty') {
-                    navigate('faculty');
-                } else {
-                    navigate('student');
-                }
-            }, 1000);
+                if (user.role === 'admin')        navigate('super-admin');
+                else if (user.role === 'faculty') navigate('faculty');
+                else                              navigate('student');
+            }, 1200);
         } else {
             showToast(res.message, "error");
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Save Changes <i class="fas fa-save"></i>';
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = 'Save Changes <i class="fas fa-save"></i>';
         }
     });
 
-
+    // ---- Wire: Back Button ----
     container.querySelector("#profile-back-btn").addEventListener("click", () => {
-        if (user.role === 'admin') {
-            navigate('admin');
-        } else if (user.role === 'faculty') {
-            navigate('faculty');
-        } else {
-            navigate('student');
-        }
+        if (user.role === 'admin')        navigate('admin');
+        else if (user.role === 'faculty') navigate('faculty');
+        else                              navigate('student');
     });
 
     return container;
 }
+
