@@ -484,6 +484,42 @@ h1, h2, h3, h4, h5, h6 {
     box-shadow: 0 8px 24px rgba(239, 68, 68, 0.35);
 }
 
+/* ---- Mobile Responsive: Developer Profile Drawer ---- */
+@media (max-width: 520px) {
+    .dev-card {
+        /* Span edge-to-edge with safe margins */
+        left: 0.75rem;
+        right: 0.75rem;
+        width: auto;
+        max-width: none;
+        border-radius: var(--border-radius-md);
+        padding: 1.75rem 1.5rem;
+        /* Push it up above the FAB with extra safe-area for iOS */
+        bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+    }
+
+    .dev-name {
+        font-size: 1.75rem;
+    }
+
+    .dev-college {
+        margin-bottom: 1.5rem;
+    }
+
+    .dev-btn {
+        padding: 0.75rem 1rem;
+        font-size: 0.88rem;
+    }
+
+    .dev-toggle-btn {
+        bottom: calc(1.25rem + env(safe-area-inset-bottom, 0px));
+        right: 1.25rem;
+        width: 52px;
+        height: 52px;
+        font-size: 1.1rem;
+    }
+}
+
 .auth-wrapper::before {
     content: '';
     position: absolute;
