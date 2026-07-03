@@ -54,7 +54,7 @@ export function renderAuthView(onLoginSuccess) {
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
 
                 try {
-                    const authenticated = await authenticateUser(usernameInput.value, passwordInput.value);
+                    const authenticated = await authenticateUser(usernameInput.value.trim(), passwordInput.value);
                     if (authenticated) {
                         showToast(`Welcome back, ${authenticated.name}!`, "success");
                         onLoginSuccess(authenticated);
@@ -68,7 +68,8 @@ export function renderAuthView(onLoginSuccess) {
                         }, 500);
                     }
                 } catch (err) {
-                    showToast("Failed to authenticate. Please try again.", "error");
+                    console.error("Login error:", err);
+                    showToast(`Login error: ${err.message || "Please check your connection and try again."}`, "error");
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = 'Sign In <i class="fas fa-arrow-right"></i>';
                 }
@@ -137,25 +138,37 @@ export function renderAuthView(onLoginSuccess) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Registering...';
 
-                const res = await registerUser(
-                    usernameInput.value,
-                    passwordInput.value,
-                    nameInput.value,
-                    roleSelect.value
-                );
-                
-                if (res.success) {
-                    showToast(res.message, "success");
-                    viewMode = 'login';
-                    renderContent();
-                } else {
-                    showToast(res.message, "error");
+                try {
+                    const res = await registerUser(
+                        usernameInput.value.trim(),
+                        passwordInput.value,
+                        nameInput.value.trim(),
+                        roleSelect.value
+                    );
+                    
+                    if (res.success) {
+                        showToast(res.message + ' Please sign in.', "success");
+                        // Remember username so user doesn't have to retype it
+                        const registeredUsername = usernameInput.value.trim().toLowerCase();
+                        viewMode = 'login';
+                        renderContent();
+                        // Auto-fill the username on the login form
+                        const loginUsernameInput = container.querySelector('#username');
+                        if (loginUsernameInput) loginUsernameInput.value = registeredUsername;
+                    } else {
+                        showToast(res.message, "error");
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = 'Register Account <i class="fas fa-user-plus"></i>';
+                        container.querySelector(".auth-card").classList.add("shake");
+                        setTimeout(() => {
+                            container.querySelector(".auth-card").classList.remove("shake");
+                        }, 500);
+                    }
+                } catch (err) {
+                    console.error("Registration error:", err);
+                    showToast(`Registration failed: ${err.message || "Please check your connection."}`, "error");
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = 'Register Account <i class="fas fa-user-plus"></i>';
-                    container.querySelector(".auth-card").classList.add("shake");
-                    setTimeout(() => {
-                        container.querySelector(".auth-card").classList.remove("shake");
-                    }, 500);
                 }
             });
 

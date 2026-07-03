@@ -43,19 +43,69 @@ async function initApp() {
         await initDB(); // Fetch all data from Firestore into cache
     } catch (err) {
         console.error("Firebase connection error:", err);
+        const rawMsg = err.message || "Failed to establish a connection with Firebase.";
+        // Format multi-line error messages for HTML display
+        const formattedMsg = rawMsg.replace(/\n/g, '<br>').replace(/  /g, '&nbsp;&nbsp;');
         appEl.innerHTML = `
             <div style="
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
-                min-height: 100vh; gap: 1.25rem; text-align: center; padding: 2rem; max-width: 600px; margin: 0 auto;
+                min-height: 100vh; gap: 1rem; text-align: center; padding: 2rem;
             ">
-                <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: hsl(355, 78%, 56%);"></i>
-                <h2 style="color: var(--text-primary); font-family: var(--font-heading); margin-bottom: 0.25rem;">Database Connection Error</h2>
-                <p style="color: var(--text-secondary); line-height: 1.6; font-size: 0.95rem; margin-bottom: 1rem;">
-                    ${err.message || "Failed to establish a connection with Firebase."}
-                </p>
-                <button onclick="location.reload()" class="btn btn-primary" style="padding: 0.75rem 2rem;">
-                    <i class="fas fa-redo"></i> Retry Connection
-                </button>
+                <div style="
+                    max-width: 640px; width: 100%;
+                    background: var(--card-bg, #1a1a2e);
+                    border: 1px solid hsl(355, 78%, 40%);
+                    border-radius: 1rem;
+                    padding: 2rem 2.5rem;
+                    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                ">
+                    <i class="fas fa-database" style="font-size: 2.5rem; color: hsl(355, 78%, 56%); margin-bottom: 1rem; display: block;"></i>
+                    <h2 style="color: var(--text-primary, #fff); font-family: var(--font-heading, 'Outfit', sans-serif); margin: 0 0 1rem 0; font-size: 1.4rem;">
+                        Firebase Connection Failed
+                    </h2>
+                    <div style="
+                        background: rgba(0,0,0,0.3);
+                        border-radius: 0.5rem;
+                        padding: 1rem 1.25rem;
+                        margin-bottom: 1.5rem;
+                        text-align: left;
+                        font-size: 0.875rem;
+                        color: var(--text-secondary, #aaa);
+                        line-height: 1.8;
+                        font-family: monospace;
+                    ">
+                        ${formattedMsg}
+                    </div>
+                    <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+                        <button onclick="location.reload()" style="
+                            background: hsl(239, 84%, 67%);
+                            color: white;
+                            border: none;
+                            padding: 0.75rem 1.75rem;
+                            border-radius: 0.5rem;
+                            cursor: pointer;
+                            font-size: 0.95rem;
+                            font-weight: 600;
+                            display: flex; align-items: center; gap: 0.5rem;
+                        ">
+                            <i class="fas fa-redo"></i> Retry Connection
+                        </button>
+                        <a href="https://console.firebase.google.com" target="_blank" style="
+                            background: transparent;
+                            color: hsl(239, 84%, 67%);
+                            border: 1px solid hsl(239, 84%, 67%);
+                            padding: 0.75rem 1.75rem;
+                            border-radius: 0.5rem;
+                            cursor: pointer;
+                            font-size: 0.95rem;
+                            font-weight: 600;
+                            text-decoration: none;
+                            display: flex; align-items: center; gap: 0.5rem;
+                        ">
+                            <i class="fas fa-external-link-alt"></i> Open Firebase Console
+                        </a>
+                    </div>
+                </div>
             </div>
         `;
         return;

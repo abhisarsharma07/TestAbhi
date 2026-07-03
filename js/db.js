@@ -331,16 +331,48 @@ function withTimeout(promise, ms, errorMessage) {
     ]);
 }
 
+// Test basic Firestore connectivity before full init
+async function testFirestoreConnectivity() {
+    try {
+        const testRef = doc(db, 'app_meta', 'config');
+        await withTimeout(getDoc(testRef), 15000, 
+            "⏱️ Connection Timeout: Firebase is not responding.\n\n" +
+            "STEPS TO FIX:\n" +
+            "1. Go to https://console.firebase.google.com\n" +
+            "2. Open your project → Build → Firestore Database\n" +
+            "3. If database doesn't exist → click 'Create database' → choose 'Start in test mode'\n" +
+            "4. If it exists → click 'Rules' tab → set rules to allow all reads/writes:\n" +
+            "   rules_version = '2';\n" +
+            "   service cloud.firestore {\n" +
+            "     match /databases/{database}/documents {\n" +
+            "       match /{document=**} { allow read, write: if true; }\n" +
+            "     }\n" +
+            "   }\n" +
+            "5. Click 'Publish' and refresh this page."
+        );
+        return true;
+    } catch (e) {
+        throw e;
+    }
+}
+
 // Initialize Storage
 export async function initDB() {
-    const timeoutMsg = "Database connection timed out. Please ensure that you have created the 'Firestore Database' in your Firebase console (Build -> Firestore Database) and set the rules to 'Test Mode'.";
+    const timeoutMs = 15000; // 15 seconds — generous for slower connections
     
     // Check if Firestore has been seeded before
     const metaRef = doc(db, 'app_meta', 'config');
     const metaSnap = await withTimeout(
         getDoc(metaRef), 
-        6000, 
-        timeoutMsg
+        timeoutMs, 
+        "⏱️ Connection Timeout: Firebase Firestore is not responding.\n\n" +
+        "Please follow these steps:\n" +
+        "1. Visit https://console.firebase.google.com and open your project.\n" +
+        "2. Go to Build → Firestore Database.\n" +
+        "3. If no database exists, click 'Create database' and choose 'Start in test mode'.\n" +
+        "4. If it already exists, click the 'Rules' tab and update rules to:\n" +
+        "   allow read, write: if true;\n" +
+        "5. Click 'Publish', then refresh this page."
     );
 
     if (!metaSnap.exists() || !metaSnap.data().initialized) {
@@ -360,13 +392,13 @@ export async function initDB() {
         });
 
         batch.set(metaRef, { initialized: true });
-        await withTimeout(batch.commit(), 6000, "Failed to write seed data to Firestore.");
+        await withTimeout(batch.commit(), timeoutMs, "Failed to write initial data to Firestore. Check your Firestore rules.");
     }
 
     // Fast Startup: ONLY fetch tests list (which is required by the dashboard shells)
     const testsSnap = await withTimeout(
         getDocs(collection(db, 'tests')), 
-        6000, 
+        timeoutMs, 
         "Failed to load assessment collections from Firestore."
     );
     cache.tests = testsSnap.docs.map(d => d.data());
