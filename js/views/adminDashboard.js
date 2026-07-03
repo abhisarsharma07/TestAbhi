@@ -2,7 +2,7 @@
    TestAbhi - Admin / Teacher Console & Test Creator
 ------------------------------------------------------------- */
 
-import { getTests, saveTests, getProctorLogs } from '../db.js';
+import { getTests, saveTests, getProctorLogs, fetchAllProctorLogs } from '../db.js';
 import { formatDate, showToast } from '../utils.js';
 import { navigate } from '../app.js';
 
@@ -1311,10 +1311,21 @@ export function renderAdminDashboard(user) {
     }
 
 
-    // -------------------------------------------------------------
-    // RENDER: Live Monitor Tab
-    // -------------------------------------------------------------
-    function renderMonitor() {
+    async function renderMonitor() {
+        paneMonitor.innerHTML = `
+            <div style="display: flex; justify-content: center; align-items: center; min-height: 200px; color: var(--text-secondary); flex-direction: column; gap: 0.75rem;">
+                <i class="fas fa-spinner fa-spin fa-lg" style="color: hsl(239, 84%, 67%);"></i>
+                <p>Fetching proctor security logs...</p>
+            </div>
+        `;
+
+        try {
+            await fetchAllProctorLogs();
+        } catch (err) {
+            paneMonitor.innerHTML = `<p style="color: var(--text-danger); text-align: center; padding: 2rem;">Failed to load logs.</p>`;
+            return;
+        }
+
         const logs = getProctorLogs();
 
         paneMonitor.innerHTML = `
@@ -1348,12 +1359,22 @@ export function renderAdminDashboard(user) {
             </div>
         `;
 
-        paneMonitor.querySelector("#refresh-logs-btn").addEventListener("click", () => {
-            const refreshedLogs = getProctorLogs();
-            paneMonitor.querySelector("#proctor-logs-tbody").innerHTML = renderProctorRows(refreshedLogs);
-            showToast("Proctoring log feed refreshed.", "info");
+        paneMonitor.querySelector("#refresh-logs-btn").addEventListener("click", async () => {
+            const btn = paneMonitor.querySelector("#refresh-logs-btn");
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
+            try {
+                await fetchAllProctorLogs();
+                const refreshedLogs = getProctorLogs();
+                paneMonitor.querySelector("#proctor-logs-tbody").innerHTML = renderProctorRows(refreshedLogs);
+                showToast("Proctoring log feed refreshed.", "info");
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Logs';
+            }
         });
     }
+
 
     function renderProctorRows(logs) {
         if (logs.length === 0) {

@@ -1,8 +1,4 @@
-/* -------------------------------------------------------------
-   TestAbhi - Core Router & Orchestrator
-------------------------------------------------------------- */
-
-import { initDB, getTests, saveTestAttempt } from './db.js';
+import { initDB, getTests, saveTestAttempt, fetchCurrentUser } from './db.js';
 import { renderHeader } from './components/header.js';
 import { renderAuthView } from './views/auth.js';
 import { renderStudentDashboard } from './views/studentDashboard.js';
@@ -65,12 +61,24 @@ async function initApp() {
     // Restore login session
     const sessionUser = sessionStorage.getItem("testabhi_session");
     if (sessionUser) {
-        currentUser = JSON.parse(sessionUser);
+        const parsed = JSON.parse(sessionUser);
+        try {
+            const latestUser = await fetchCurrentUser(parsed.username);
+            if (latestUser) {
+                currentUser = latestUser;
+                sessionStorage.setItem("testabhi_session", JSON.stringify(latestUser));
+            } else {
+                currentUser = parsed;
+            }
+        } catch (e) {
+            currentUser = parsed;
+        }
         currentPage = getDefaultPage(currentUser.role);
     }
 
     render();
 }
+
 
 function getDefaultPage(role) {
     if (role === 'admin') return 'super-admin';

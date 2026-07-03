@@ -1,8 +1,4 @@
-/* -------------------------------------------------------------
-   TestAbhi - Profile View (Multi-role Profile & Edit Settings)
-   ------------------------------------------------------------- */
-
-import { updateUserProfile, getTests, getUsers } from '../db.js';
+import { updateUserProfile, getTests, fetchAllUsers } from '../db.js';
 import { showToast } from '../utils.js';
 import { navigate } from '../app.js';
 
@@ -10,10 +6,8 @@ export function renderProfileView(user) {
     const container = document.createElement("div");
     container.className = "dashboard-container fade-in";
 
-    // Fetch up-to-date stats
-    const users = getUsers();
     const tests = getTests();
-    const currentUserData = users[user.username] || user;
+    const currentUserData = user;
 
     let roleDescription = "";
     let statsHtml = "";
@@ -49,16 +43,43 @@ export function renderProfileView(user) {
         `;
     } else {
         roleDescription = "System Super Administrator";
-        const totalUsers = Object.keys(users).length;
         statsHtml = `
-            <div style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; width: 100%; margin-top: 1rem;">
+            <div id="admin-profile-stats" style="display: grid; grid-template-columns: 1fr; gap: 1.5rem; width: 100%; margin-top: 1rem;">
                 <div class="stat-card">
-                    <div class="stat-value" style="color: hsl(355, 78%, 56%);">${totalUsers}</div>
-                    <div class="stat-label">Total Registered Accounts</div>
+                    <div class="stat-value" style="color: hsl(355, 78%, 56%); font-size: 1.25rem;"><i class="fas fa-spinner fa-spin"></i></div>
+                    <div class="stat-label">Loading accounts count...</div>
                 </div>
             </div>
         `;
+
+        // Async load admin stats
+        setTimeout(async () => {
+            try {
+                const users = await fetchAllUsers();
+                const totalUsers = Object.keys(users).length;
+                const statsBox = container.querySelector("#admin-profile-stats");
+                if (statsBox) {
+                    statsBox.innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: hsl(355, 78%, 56%);">${totalUsers}</div>
+                            <div class="stat-label">Total Registered Accounts</div>
+                        </div>
+                    `;
+                }
+            } catch (err) {
+                const statsBox = container.querySelector("#admin-profile-stats");
+                if (statsBox) {
+                    statsBox.innerHTML = `
+                        <div class="stat-card">
+                            <div class="stat-value" style="color: hsl(0, 85%, 60%); font-size: 1.2rem;">Error</div>
+                            <div class="stat-label">Could not load stats</div>
+                        </div>
+                    `;
+                }
+            }
+        }, 50);
     }
+
 
     container.innerHTML = `
         <div class="welcome-banner">

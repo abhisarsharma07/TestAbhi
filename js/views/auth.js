@@ -47,20 +47,33 @@ export function renderAuthView(onLoginSuccess) {
             const usernameInput = container.querySelector("#username");
             const passwordInput = container.querySelector("#password");
             
-            form.addEventListener("submit", (e) => {
+            form.addEventListener("submit", async (e) => {
                 e.preventDefault();
-                const authenticated = authenticateUser(usernameInput.value, passwordInput.value);
-                if (authenticated) {
-                    showToast(`Welcome back, ${authenticated.name}!`, "success");
-                    onLoginSuccess(authenticated);
-                } else {
-                    showToast("Invalid username or password. Please try again.", "error");
-                    container.querySelector(".auth-card").classList.add("shake");
-                    setTimeout(() => {
-                        container.querySelector(".auth-card").classList.remove("shake");
-                    }, 500);
+                const submitBtn = form.querySelector("[type='submit']");
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing In...';
+
+                try {
+                    const authenticated = await authenticateUser(usernameInput.value, passwordInput.value);
+                    if (authenticated) {
+                        showToast(`Welcome back, ${authenticated.name}!`, "success");
+                        onLoginSuccess(authenticated);
+                    } else {
+                        showToast("Invalid username or password. Please try again.", "error");
+                        submitBtn.disabled = false;
+                        submitBtn.innerHTML = 'Sign In <i class="fas fa-arrow-right"></i>';
+                        container.querySelector(".auth-card").classList.add("shake");
+                        setTimeout(() => {
+                            container.querySelector(".auth-card").classList.remove("shake");
+                        }, 500);
+                    }
+                } catch (err) {
+                    showToast("Failed to authenticate. Please try again.", "error");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Sign In <i class="fas fa-arrow-right"></i>';
                 }
             });
+
             
             container.querySelector("#go-to-register").addEventListener("click", (e) => {
                 e.preventDefault();

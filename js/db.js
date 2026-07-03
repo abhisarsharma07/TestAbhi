@@ -349,19 +349,45 @@ export async function initDB() {
         await batch.commit();
     }
 
-    // Load everything into cache
-    const [testsSnap, usersSnap, logsSnap] = await Promise.all([
-        getDocs(collection(db, 'tests')),
-        getDocs(collection(db, 'users')),
-        getDocs(collection(db, 'proctor_logs'))
-    ]);
-
+    // Fast Startup: ONLY fetch tests list (which is required by the dashboard shells)
+    const testsSnap = await getDocs(collection(db, 'tests'));
     cache.tests = testsSnap.docs.map(d => d.data());
+    
+    // Clear user and logs cache — populated dynamically later
     cache.users = {};
-    usersSnap.docs.forEach(d => { cache.users[d.id] = d.data(); });
+    cache.proctor_logs = [];
+}
+
+// =======================
+// Async demand fetchers (Populates cache dynamically on-demand)
+// =======================
+export async function fetchCurrentUser(username) {
+    const cleanUsername = username.toLowerCase().trim();
+    const userRef = doc(db, 'users', cleanUsername);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+        const userData = userSnap.data();
+        cache.users[cleanUsername] = userData;
+        return { username: cleanUsername, ...userData };
+    }
+    return null;
+}
+
+export async function fetchAllUsers() {
+    const usersSnap = await getDocs(collection(db, 'users'));
+    cache.users = {};
+    usersSnap.docs.forEach(d => {
+        cache.users[d.id] = d.data();
+    });
+    return cache.users;
+}
+
+export async function fetchAllProctorLogs() {
+    const logsSnap = await getDocs(collection(db, 'proctor_logs'));
     cache.proctor_logs = logsSnap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    return cache.proctor_logs;
 }
 
 // =======================
@@ -408,10 +434,16 @@ export async function addProctorLog(log) {
 // ==================
 // Auth helpers
 // ==================
-export function authenticateUser(username, password) {
-    const user = cache.users[username.toLowerCase().trim()];
-    if (user && user.password === password) {
-        return { username: username.toLowerCase().trim(), ...user };
+export async function authenticateUser(username, password) {
+    const cleanUsername = username.toLowerCase().trim();
+    const userRef = doc(db, 'users', cleanUsername);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
+        const user = userSnap.data();
+        if (user.password === password) {
+            cache.users[cleanUsername] = user;
+            return { username: cleanUsername, ...user };
+        }
     }
     return null;
 }
@@ -422,22 +454,30 @@ export async function registerUser(username, password, name, role) {
     if (cleanUsername === 'admin' || role === 'admin') {
         return { success: false, message: "Cannot register a new Administrator account." };
     }
-    if (cache.users[cleanUsername]) {
+
+    const userRef = doc(db, 'users', cleanUsername);
+    const userSnap = await getDoc(userRef);
+    if (userSnap.exists()) {
         return { success: false, message: "Username already exists. Please choose another." };
     }
 
     const newUser = { role, password, name: name.trim(), history: [] };
     cache.users[cleanUsername] = newUser;
-    await setDoc(doc(db, 'users', cleanUsername), newUser);
+    await setDoc(userRef, newUser);
     return { success: true, message: "Registration successful! You can now sign in." };
 }
 
 export async function updateUserProfile(username, newName, newPassword) {
     const cleanUsername = username.toLowerCase().trim();
-    if (cache.users[cleanUsername]) {
-        if (newName) cache.users[cleanUsername].name = newName.trim();
-        if (newPassword) cache.users[cleanUsername].password = newPassword;
-        await setDoc(doc(db, 'users', cleanUsername), cache.users[cleanUsername]);
+    const userRef = doc(db, 'users', cleanUsername);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (newName) userData.name = newName.trim();
+        if (newPassword) userData.password = newPassword;
+        cache.users[cleanUsername] = userData;
+        await setDoc(userRef, userData);
         return { success: true, message: "Profile updated successfully!" };
     }
     return { success: false, message: "User not found." };
@@ -445,11 +485,17 @@ export async function updateUserProfile(username, newName, newPassword) {
 
 export async function saveTestAttempt(username, attempt) {
     const cleanUsername = username.toLowerCase().trim();
-    if (cache.users[cleanUsername]) {
-        if (!cache.users[cleanUsername].history) cache.users[cleanUsername].history = [];
-        cache.users[cleanUsername].history.unshift(attempt);
-        await setDoc(doc(db, 'users', cleanUsername), cache.users[cleanUsername]);
+    const userRef = doc(db, 'users', cleanUsername);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (!userData.history) userData.history = [];
+        userData.history.unshift(attempt);
+        cache.users[cleanUsername] = userData;
+        await setDoc(userRef, userData);
         return true;
     }
     return false;
 }
+

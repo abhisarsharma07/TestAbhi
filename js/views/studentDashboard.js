@@ -2,7 +2,7 @@
    TestAbhi - Student Dashboard View
 ------------------------------------------------------------- */
 
-import { getTests, getUsers } from '../db.js';
+import { getTests } from '../db.js';
 import { navigate } from '../app.js';
 import { formatTime, formatDate } from '../utils.js';
 
@@ -10,10 +10,8 @@ export function renderStudentDashboard(user, onSelectTest, onViewAttempt) {
     const container = document.createElement("div");
     container.className = "dashboard-container fade-in";
 
-    // Refresh user object from DB to get latest history
-    const allUsers = getUsers();
-    const currentUser = allUsers[user.username] || user;
-    const history = currentUser.history || [];
+    const history = user.history || [];
+
 
     // Calculate Stats
     const totalTests = history.length;

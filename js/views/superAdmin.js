@@ -1,15 +1,25 @@
-/* -------------------------------------------------------------
-   TestAbhi - Super Admin View (User & Role Management)
-   ------------------------------------------------------------- */
-
-import { getUsers, saveUsers } from '../db.js';
+import { getUsers, saveUsers, fetchAllUsers } from '../db.js';
 import { showToast } from '../utils.js';
 
 export function renderSuperAdminDashboard(currentUser) {
     const container = document.createElement("div");
     container.className = "dashboard-container fade-in";
 
-    const renderPanel = () => {
+    const renderPanel = async () => {
+        container.innerHTML = `
+            <div style="display: flex; justify-content: center; align-items: center; min-height: 300px; color: var(--text-secondary); flex-direction: column; gap: 0.75rem;">
+                <i class="fas fa-spinner fa-spin fa-2x" style="color: hsl(239, 84%, 67%);"></i>
+                <p>Fetching system user directory...</p>
+            </div>
+        `;
+
+        try {
+            await fetchAllUsers();
+        } catch (err) {
+            container.innerHTML = `<p style="color: var(--text-danger); text-align: center; padding: 2rem;">Failed to fetch directory.</p>`;
+            return;
+        }
+
         const users = getUsers();
         const userList = Object.keys(users).map(username => ({
             username,
@@ -23,6 +33,7 @@ export function renderSuperAdminDashboard(currentUser) {
             <div class="welcome-banner">
                 <h1>Super Admin Dashboard</h1>
                 <p>Manage system users, adjust roles, and monitor portal platform access.</p>
+
             </div>
 
             <!-- Stats Bar -->
