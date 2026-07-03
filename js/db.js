@@ -486,36 +486,88 @@ export async function addProctorLog(log) {
 // Auth helpers
 // ==================
 export async function authenticateUser(username, password) {
+    if (!username || !password) return null;
+    
     const cleanUsername = username.toLowerCase().trim();
     const userRef = doc(db, 'users', cleanUsername);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-        const user = userSnap.data();
-        if (user.password === password) {
-            cache.users[cleanUsername] = user;
-            return { username: cleanUsername, ...user };
-        }
+    
+    let userSnap;
+    try {
+        userSnap = await withTimeout(
+            getDoc(userRef), 
+            10000, 
+            "Login timed out. Please check your internet connection and try again."
+        );
+    } catch (e) {
+        throw e; // re-throw so auth.js catch block shows the actual error
     }
-    return null;
+    
+    if (!userSnap.exists()) {
+        return null; // user not found
+    }
+    
+    const user = userSnap.data();
+    if (user.password === password) {
+        cache.users[cleanUsername] = user;
+        return { username: cleanUsername, ...user };
+    }
+    
+    return null; // wrong password
 }
 
 export async function registerUser(username, password, name, role) {
     const cleanUsername = username.toLowerCase().trim();
+    const cleanName = name ? name.trim() : '';
 
+    // Input validation
+    if (!cleanUsername || cleanUsername.length < 3) {
+        return { success: false, message: "Username must be at least 3 characters long." };
+    }
+    if (!password || password.length < 4) {
+        return { success: false, message: "Password must be at least 4 characters long." };
+    }
+    if (!cleanName) {
+        return { success: false, message: "Please enter your full name." };
+    }
     if (cleanUsername === 'admin' || role === 'admin') {
         return { success: false, message: "Cannot register a new Administrator account." };
     }
-
-    const userRef = doc(db, 'users', cleanUsername);
-    const userSnap = await getDoc(userRef);
-    if (userSnap.exists()) {
-        return { success: false, message: "Username already exists. Please choose another." };
+    if (!/^[a-z0-9_]+$/.test(cleanUsername)) {
+        return { success: false, message: "Username can only contain letters, numbers, and underscores." };
     }
 
-    const newUser = { role, password, name: name.trim(), history: [] };
-    cache.users[cleanUsername] = newUser;
-    await setDoc(userRef, newUser);
-    return { success: true, message: "Registration successful! You can now sign in." };
+    // Check if username already exists in Firestore
+    const userRef = doc(db, 'users', cleanUsername);
+    let userSnap;
+    try {
+        userSnap = await withTimeout(
+            getDoc(userRef),
+            10000,
+            "Registration timed out. Please check your internet and try again."
+        );
+    } catch (e) {
+        throw e;
+    }
+    
+    if (userSnap.exists()) {
+        return { success: false, message: "Username already taken. Please choose another." };
+    }
+
+    const newUser = { role, password, name: cleanName, history: [] };
+    
+    // Write to Firestore FIRST, then update cache
+    try {
+        await withTimeout(
+            setDoc(userRef, newUser),
+            10000,
+            "Failed to save your account. Please check your internet and try again."
+        );
+    } catch (e) {
+        throw e;
+    }
+    
+    cache.users[cleanUsername] = newUser; // Only cache AFTER successful write
+    return { success: true, message: "Account created successfully!" };
 }
 
 export async function updateUserProfile(username, newName, newPassword) {
