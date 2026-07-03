@@ -51,7 +51,7 @@ export function renderTestResults(attempt, onBackToDashboard) {
 
             <!-- Score breakdown text -->
             <div style="margin-top: -0.5rem;">
-                <h3 style="font-size: 1.5rem; font-weight: 700; color: ${score >= 70 ? 'hsl(142, 70%, 45%)' : (score >= 40 ? 'hsl(38, 92%, 50%)' : 'hsl(355, 78%, 56%)');}">
+                <h3 style="font-size: 1.5rem; font-weight: 700; color: ${score >= 70 ? 'hsl(142, 70%, 45%)' : (score >= 40 ? 'hsl(38, 92%, 50%)' : 'hsl(355, 78%, 56%)')}">
                     ${score >= 80 ? 'Exceptional Performance!' : (score >= 40 ? 'Good Effort!' : 'Keep Learning!')}
                 </h3>
             </div>
@@ -161,8 +161,8 @@ export function renderTestResults(attempt, onBackToDashboard) {
                             answerDetailHtml = `
                                 <div class="review-details">
                                     ${q.options.map((opt, oIdx) => {
-                                        const isSelected = q.studentAnswer.includes(oIdx);
-                                        const isCorrectOpt = q.correctAnswers.includes(oIdx);
+                                        const isSelected = Array.isArray(q.studentAnswer) && q.studentAnswer.includes(oIdx);
+                                        const isCorrectOpt = Array.isArray(q.correctAnswers) && q.correctAnswers.includes(oIdx);
                                         let classStyle = '';
                                         let iconStyle = '';
 

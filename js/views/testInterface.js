@@ -119,6 +119,10 @@ export function renderTestInterface(user, test, onSubmitTest) {
                     <i class="fas fa-chevron-left"></i> Previous
                 </button>
                 
+                <button class="btn btn-secondary" id="clear-answer-btn" style="color: hsl(355, 78%, 60%); border-color: rgba(239, 68, 68, 0.25);" title="Clear your selection for this question">
+                    <i class="fas fa-eraser"></i> Clear
+                </button>
+
                 <button class="btn btn-secondary" id="flag-question-btn" style="color: hsl(38, 92%, 50%); border-color: rgba(245, 158, 11, 0.2);">
                     <i class="far fa-flag"></i> Mark for Review
                 </button>
@@ -196,6 +200,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
     const prevBtn = container.querySelector("#prev-question-btn");
     const nextBtn = container.querySelector("#next-question-btn");
     const flagBtn = container.querySelector("#flag-question-btn");
+    const clearBtn = container.querySelector("#clear-answer-btn");
     const submitBtn = container.querySelector("#submit-exam-btn");
     const proctorLogBox = container.querySelector("#proctoring-log-box");
 
@@ -894,6 +899,31 @@ export function renderTestInterface(user, test, onSubmitTest) {
 
     flagBtn.addEventListener("click", () => {
         flaggedQuestions[currentIdx] = !flaggedQuestions[currentIdx];
+        renderQuestion();
+        renderSidebarGrid();
+    });
+
+    // Clear Selection button — resets the student's answer for the current question
+    clearBtn.addEventListener("click", () => {
+        const q = test.questions[currentIdx];
+        if (!q) return;
+
+        if (q.type === 'multi') {
+            studentAnswers[q.id] = [];
+        } else {
+            studentAnswers[q.id] = '';
+        }
+
+        // Visual feedback: briefly flash the button
+        clearBtn.innerHTML = '<i class="fas fa-check"></i> Cleared!';
+        clearBtn.style.color = 'hsl(142, 70%, 45%)';
+        clearBtn.style.borderColor = 'rgba(16, 185, 129, 0.35)';
+        setTimeout(() => {
+            clearBtn.innerHTML = '<i class="fas fa-eraser"></i> Clear';
+            clearBtn.style.color = 'hsl(355, 78%, 60%)';
+            clearBtn.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+        }, 800);
+
         renderQuestion();
         renderSidebarGrid();
     });
