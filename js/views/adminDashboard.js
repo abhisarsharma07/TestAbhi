@@ -1450,27 +1450,35 @@ export function renderAdminDashboard(user) {
                             </select>
                         </div>
                         <div class="input-group" style="margin-bottom: 0;">
-                            <label>Starter Code Template</label>
-                            <textarea class="input-control q-template-textarea" data-index="${qIdx}" rows="3" style="font-family: monospace; font-size: 0.85rem;" placeholder="// Provide function template signature...">${q.template || ''}</textarea>
+                            <label>Code Snippet</label>
+                            <textarea class="input-control q-template-textarea" data-index="${qIdx}" rows="3" style="font-family: monospace; font-size: 0.85rem;" placeholder="// Paste code snippet here...">${q.template || ''}</textarea>
                         </div>
                     </div>
                     <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 0.5rem;">
-                        Assertion Test Cases
+                        Options & Answer Keys
                     </label>
-                    <div class="assertions-inputs-list" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.75rem;">
-                        ${(q.assertions || []).map((as, aIdx) => `
-                            <div style="display: flex; align-items: center; gap: 0.75rem;">
-                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; min-width: 60px;">Assert #${aIdx + 1}:</span>
-                                <input type="text" class="input-control q-assert-input" data-qindex="${qIdx}" data-aindex="${aIdx}" value="${as.input ? as.input.join(', ') : ''}" placeholder="Inputs (e.g. 2, 3 or 'hello')" style="flex: 2;">
-                                <input type="text" class="input-control q-assert-expected" data-qindex="${qIdx}" data-aindex="${aIdx}" value="${as.expected || ''}" placeholder="Expected Output (e.g. 5 or 'olleh')" style="flex: 1.5;">
-                                <button class="icon-btn remove-assert-item" data-qindex="${qIdx}" data-aindex="${aIdx}" title="Delete Test Case" style="color: hsl(355, 78%, 56%);">
-                                    <i class="fas fa-times"></i>
-                                </button>
-                            </div>
-                        `).join('')}
+                    <div class="options-inputs-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        ${(q.options || []).map((opt, oIdx) => {
+                            const isCorrectSingle = q.answer === oIdx;
+                            const markerIcon = isCorrectSingle ? 'fa-dot-circle' : 'fa-circle';
+
+                            return `
+                                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                    <button class="icon-btn toggle-option-answer" data-qindex="${qIdx}" data-oindex="${oIdx}" title="Mark as correct answer" style="border-color: ${isCorrectSingle ? 'hsl(142, 70%, 45%)' : 'var(--border-color)'}; color: ${isCorrectSingle ? 'hsl(142, 70%, 45%)' : 'var(--text-secondary)'};">
+                                        <i class="far ${markerIcon}"></i>
+                                    </button>
+                                    <input type="text" class="input-control q-option-text" data-qindex="${qIdx}" data-oindex="${oIdx}" value="${opt}" placeholder="Option Value ${String.fromCharCode(65 + oIdx)}" required style="flex: 1;">
+                                    ${q.options.length > 2 ? `
+                                        <button class="icon-btn remove-option-item" data-qindex="${qIdx}" data-oindex="${oIdx}" title="Delete option" style="color: hsl(355, 78%, 56%);">
+                                            <i class="fas fa-times"></i>
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
-                    <button class="btn btn-secondary add-assert-item" data-index="${qIdx}" style="padding: 0.4rem 1rem; font-size: 0.8rem;">
-                        <i class="fas fa-plus"></i> Add Test Case Assertion
+                    <button class="btn btn-secondary add-option-item" data-index="${qIdx}" style="padding: 0.4rem 1rem; font-size: 0.8rem; margin-top: 0.75rem;">
+                        <i class="fas fa-plus"></i> Add Option Option
                     </button>
                 `;
             } else {
@@ -1540,52 +1548,13 @@ export function renderAdminDashboard(user) {
                 });
             }
 
-            optionsWrapper.querySelectorAll(".q-assert-input").forEach(input => {
-                input.addEventListener("input", (e) => {
-                    const qi = parseInt(input.getAttribute("data-qindex"), 10);
-                    const ai = parseInt(input.getAttribute("data-aindex"), 10);
-                    builderQuestions[qi].assertions[ai].input = e.target.value.split(',').map(s => s.trim());
-                });
-            });
-
-            optionsWrapper.querySelectorAll(".q-assert-expected").forEach(expected => {
-                expected.addEventListener("input", (e) => {
-                    const qi = parseInt(expected.getAttribute("data-qindex"), 10);
-                    const ai = parseInt(expected.getAttribute("data-aindex"), 10);
-                    builderQuestions[qi].assertions[ai].expected = e.target.value;
-                });
-            });
-
-            optionsWrapper.querySelectorAll(".remove-assert-item").forEach(btn => {
-                btn.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    const qi = parseInt(btn.getAttribute("data-qindex"), 10);
-                    const ai = parseInt(btn.getAttribute("data-aindex"), 10);
-                    builderQuestions[qi].assertions.splice(ai, 1);
-                    renderBuilderQuestions();
-                });
-            });
-
-            const addAssertBtn = optionsWrapper.querySelector(".add-assert-item");
-            if (addAssertBtn) {
-                addAssertBtn.addEventListener("click", (e) => {
-                    e.preventDefault();
-                    const qi = parseInt(addAssertBtn.getAttribute("data-index"), 10);
-                    if (!builderQuestions[qi].assertions) {
-                        builderQuestions[qi].assertions = [];
-                    }
-                    builderQuestions[qi].assertions.push({ input: [''], expected: '' });
-                    renderBuilderQuestions();
-                });
-            }
-
             optionsWrapper.querySelectorAll(".toggle-option-answer").forEach(btn => {
                 btn.addEventListener("click", (e) => {
                     e.preventDefault();
                     const qi = parseInt(btn.getAttribute("data-qindex"), 10);
                     const oi = parseInt(btn.getAttribute("data-oindex"), 10);
                     
-                    if (builderQuestions[qi].type === 'single') {
+                    if (builderQuestions[qi].type === 'single' || builderQuestions[qi].type === 'code') {
                         builderQuestions[qi].answer = oi;
                     } else {
                         const answersArr = builderQuestions[qi].answers;
@@ -1607,7 +1576,7 @@ export function renderAdminDashboard(user) {
                     builderQuestions[qi].options.splice(oi, 1);
                     
                     // Reset answer indexes if out of bounds
-                    if (builderQuestions[qi].type === 'single') {
+                    if (builderQuestions[qi].type === 'single' || builderQuestions[qi].type === 'code') {
                         if (builderQuestions[qi].answer >= builderQuestions[qi].options.length) {
                             builderQuestions[qi].answer = 0;
                         }
@@ -1660,13 +1629,21 @@ export function renderAdminDashboard(user) {
                     builderQuestions[idx].answer = '';
                 } else if (e.target.value === 'multi') {
                     builderQuestions[idx].answers = [];
+                    if (!builderQuestions[idx].options) {
+                        builderQuestions[idx].options = ['', ''];
+                    }
                 } else if (e.target.value === 'code') {
                     builderQuestions[idx].language = 'JavaScript';
-                    builderQuestions[idx].template = "function reverseString(str) {\n    // Write your code here\n    \n}";
-                    builderQuestions[idx].assertions = [{ input: ["'hello'"], expected: "'olleh'" }];
-                    builderQuestions[idx].answer = '';
+                    builderQuestions[idx].template = "// Write your code here\n";
+                    builderQuestions[idx].answer = 0;
+                    if (!builderQuestions[idx].options || builderQuestions[idx].options.length === 0) {
+                        builderQuestions[idx].options = ['', ''];
+                    }
                 } else {
                     builderQuestions[idx].answer = 0;
+                    if (!builderQuestions[idx].options) {
+                        builderQuestions[idx].options = ['', ''];
+                    }
                 }
                 renderBuilderQuestions();
             });
@@ -1892,9 +1869,9 @@ export function renderAdminDashboard(user) {
                 text: q.text.trim(),
                 sectionName: q.sectionName || 'General',
                 sectionDuration: parseInt(q.sectionDuration, 10) || 5,
-                ...((q.type === 'single' || q.type === 'multi') ? { options: q.options.map(o => o.trim()) } : {}),
+                ...((q.type === 'single' || q.type === 'multi' || q.type === 'code') ? { options: q.options.map(o => o.trim()) } : {}),
                 ...(q.type === 'text' ? { answer: q.answer.trim() } : {}),
-                ...(q.type === 'code' ? { language: q.language || 'JavaScript', template: q.template || '', assertions: q.assertions || [], answer: '' } : {}),
+                ...(q.type === 'code' ? { language: q.language || 'JavaScript', template: q.template || '', answer: q.answer } : {}),
                 ...(q.type === 'single' ? { answer: q.answer } : {}),
                 ...(q.type === 'multi' ? { answers: q.answers } : {}),
                 explanation: q.explanation.trim()

@@ -3,7 +3,7 @@
 ------------------------------------------------------------- */
 
 import { addProctorLog } from '../db.js';
-import { formatTime, showToast, formatQuestionText } from '../utils.js';
+import { formatTime, showToast, formatQuestionText, escapeHtml } from '../utils.js';
 
 export function renderTestInterface(user, test, onSubmitTest) {
     const container = document.createElement("div");
@@ -68,8 +68,6 @@ export function renderTestInterface(user, test, onSubmitTest) {
     test.questions.forEach(q => {
         if (q.type === 'multi') {
             studentAnswers[q.id] = [];
-        } else if (q.type === 'code') {
-            studentAnswers[q.id] = q.template || '';
         } else {
             studentAnswers[q.id] = '';
         }
@@ -292,40 +290,21 @@ export function renderTestInterface(user, test, onSubmitTest) {
         } else if (q.type === 'code') {
             const qLang = q.language || 'JavaScript';
             inputHtml = `
-                <div class="code-split-container">
-                    <div class="code-instructions-pane">
-                        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
-                            <strong style="font-size: 0.9rem; text-transform: uppercase; color: hsl(239, 84%, 57%);">Task Instructions</strong>
-                            <span class="test-badge badge-medium" style="background-color: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); color: hsl(263, 90%, 65%); font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${qLang}</span>
-                        </div>
-                        <p style="margin: 0.25rem 0; font-size: 0.85rem; color: var(--text-secondary);">Implement the solution in <strong>${qLang}</strong>. Ensure you follow the requirements and input constraints correctly.</p>
-                        
-                        <strong style="font-size: 0.85rem; margin-top: 0.75rem; display: block; margin-bottom: 0.35rem;">Assertion Test Cases:</strong>
-                        <div style="display: flex; flex-direction: column; gap: 0.5rem; width: 100%;">
-                            ${q.assertions.map((as, aIdx) => `
-                                <div class="code-assertion-item" id="assert-${q.id}-${aIdx}">
-                                    <span>Assert ${aIdx + 1}: input <code>(${as.input ? as.input.join(', ') : ''})</code> expected <code>${as.expected}</code></span>
-                                    <span class="code-assertion-status" style="color: var(--text-muted); font-size: 0.75rem;">Untested</span>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                    <div class="code-editor-pane">
-                        <textarea class="ide-textarea" id="ide-textarea-field" spellcheck="false" placeholder="// Write your ${qLang} solution here...">${studentAnswers[q.id] || ''}</textarea>
-                        
-                        <div style="display: flex; gap: 1rem; align-items: center;">
-                            <button class="btn btn-primary" id="run-code-btn" style="flex: 1; justify-content: center; padding: 0.85rem;">
-                                <i class="fas fa-play"></i> Run Test Cases
-                            </button>
-                        </div>
-
-                        <div class="console-output-wrapper">
-                            <div class="console-title"><i class="fas fa-terminal"></i> Console Log Output</div>
-                            <div id="console-logs-output" style="font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">
-                                Code execution results will print here.
+                <div style="margin-top: 0.5rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                    <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold;">Language:</span>
+                    <span class="test-badge badge-medium" style="background-color: rgba(139, 92, 246, 0.1); border: 1px solid rgba(139, 92, 246, 0.3); color: hsl(263, 90%, 65%); font-size: 0.75rem; padding: 0.15rem 0.4rem; border-radius: 4px; font-weight: 600;">${qLang}</span>
+                </div>
+                ${q.template ? `<pre class="embedded-code-block" style="margin-bottom: 1.5rem;"><code>${escapeHtml(q.template)}</code></pre>` : ''}
+                <div class="options-container">
+                    ${(q.options || []).map((opt, i) => {
+                        const isSelected = studentAnswers[q.id] === i;
+                        return `
+                            <div class="option-item ${isSelected ? 'selected' : ''}" data-index="${i}">
+                                <div class="option-marker">${String.fromCharCode(65 + i)}</div>
+                                <span style="font-size: 0.95rem;">${opt}</span>
                             </div>
-                        </div>
-                    </div>
+                        `;
+                    }).join('')}
                 </div>
             `;
         }
@@ -339,7 +318,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
         `;
 
         // Event listeners for options selection
-        if (q.type === 'single') {
+        if (q.type === 'single' || q.type === 'code') {
             questionCard.querySelectorAll(".option-item").forEach(item => {
                 item.addEventListener("click", () => {
                     const selIdx = parseInt(item.getAttribute("data-index"), 10);
@@ -368,87 +347,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
                 studentAnswers[q.id] = e.target.value;
                 renderSidebarGrid();
             });
-        } else if (q.type === 'code') {
-            const textarea = questionCard.querySelector("#ide-textarea-field");
-            textarea.addEventListener("input", (e) => {
-                studentAnswers[q.id] = e.target.value;
-                renderSidebarGrid();
-            });
-
-            const runBtn = questionCard.querySelector("#run-code-btn");
-            runBtn.addEventListener("click", (e) => {
-                e.preventDefault();
-                runUnitTests(q);
-            });
         }
-    }
-
-    function runUnitTests(q) {
-        const userCode = studentAnswers[q.id] || '';
-        const logsContainer = questionCard.querySelector("#console-logs-output");
-        logsContainer.innerHTML = '';
-        
-        const qLang = q.language || 'JavaScript';
-        
-        if (qLang !== 'JavaScript') {
-            logsContainer.innerHTML = `<div class="console-log" style="color: hsl(190, 90%, 50%); font-weight: 500;">[INFO] Initializing ${qLang} Sandboxed Compiler Sandbox...</div>`;
-            
-            setTimeout(() => {
-                logsContainer.innerHTML += `<div class="console-log" style="color: hsl(190, 90%, 50%); font-weight: 500;">[INFO] Compiling and verifying code structure...</div>`;
-                
-                setTimeout(() => {
-                    if (!userCode.trim()) {
-                        logsContainer.innerHTML += `<div class="console-log fail">[ERROR] Compilation failed: Empty code block. Please write your solution.</div>`;
-                        showToast("Compilation failed: Empty code block.", "error");
-                        return;
-                    }
-                    
-                    let allPassed = true;
-                    q.assertions.forEach((as, aIdx) => {
-                        const assertEl = questionCard.querySelector(`#assert-${q.id}-${aIdx}`);
-                        const statusEl = assertEl.querySelector(".code-assertion-status");
-                        
-                        statusEl.innerText = "Passed";
-                        statusEl.style.color = "hsl(142, 70%, 45%)";
-                        
-                        logsContainer.innerHTML += `<div class="console-log pass">[PASS] Assert ${aIdx + 1} (simulated): expected ${as.expected}, verified signature match!</div>`;
-                    });
-                    
-                    logsContainer.innerHTML += `<div class="console-log pass" style="font-weight: bold; margin-top: 0.5rem; color: hsl(142, 70%, 45%);">[SUCCESS] Code verification completed successfully!</div>`;
-                    showToast("Simulated test cases completed successfully!", "success");
-                }, 400);
-            }, 400);
-            return;
-        }
-
-        const userCodeClean = studentAnswers[q.id];
-        const funcMatch = (q.template || '').match(/function\s+([a-zA-Z0-9_]+)/);
-        const funcName = funcMatch ? funcMatch[1] : '';
-        let allPassed = true;
-
-        q.assertions.forEach((as, aIdx) => {
-            const testResult = runAssertion(userCodeClean, funcName, as.input, as.expected);
-            const assertEl = questionCard.querySelector(`#assert-${q.id}-${aIdx}`);
-            const statusEl = assertEl.querySelector(".code-assertion-status");
-            
-            if (testResult.passed) {
-                statusEl.innerText = "Passed";
-                statusEl.style.color = "hsl(142, 70%, 45%)";
-                logsContainer.innerHTML += `<div class="console-log pass">[PASS] Assert ${aIdx + 1}: expected ${as.expected}, got ${testResult.result}</div>`;
-            } else {
-                allPassed = false;
-                statusEl.innerText = "Failed";
-                statusEl.style.color = "hsl(355, 78%, 56%)";
-                logsContainer.innerHTML += `<div class="console-log fail">[FAIL] Assert ${aIdx + 1}: expected ${as.expected}, got ${testResult.result}</div>`;
-            }
-        });
-
-        if (allPassed) {
-            showToast("All test cases passed successfully!", "success");
-        } else {
-            showToast("Some test cases failed. Please inspect logs.", "error");
-        }
-    }
 
     function renderSidebarGrid() {
         sidebarGrid.innerHTML = '';
@@ -666,22 +565,13 @@ export function renderTestInterface(user, test, onSubmitTest) {
                     type: q.type
                 });
             } else if (q.type === 'code') {
-                isAttempted = !!(studentAns && studentAns.trim());
-                const funcMatch = q.template.match(/function\s+([a-zA-Z0-9_]+)/);
-                const funcName = funcMatch ? funcMatch[1] : '';
-                let allAssertsPassed = true;
-                
-                q.assertions.forEach(as => {
-                    const testResult = runAssertion(studentAns, funcName, as.input, as.expected);
-                    if (!testResult.passed) {
-                        allAssertsPassed = false;
-                    }
-                });
-                
-                isCorrect = allAssertsPassed;
+                isAttempted = studentAns !== undefined && studentAns !== '';
+                isCorrect = studentAns === q.answer;
                 reviewDetails.push({
                     questionText: q.text,
-                    studentAnswer: studentAns,
+                    options: q.options,
+                    correctAnswer: q.options[q.answer] || 'Unknown',
+                    studentAnswer: (studentAns !== undefined && studentAns !== '') ? (q.options[studentAns] || 'Unknown') : 'Not Attempted',
                     isCorrect,
                     explanation: q.explanation,
                     type: q.type
