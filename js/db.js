@@ -144,24 +144,30 @@ const DEFAULT_TESTS = [
             {
                 id: "c1",
                 type: "code",
-                text: "Write a function named 'reverseString(str)' that accepts a string and returns it reversed (e.g., reverseString('hello') should return 'olleh').",
-                template: "function reverseString(str) {\n    // Write your code here\n    \n}",
-                assertions: [
-                    { input: ["'hello'"], expected: "'olleh'" },
-                    { input: ["'TestAbhi'"], expected: "'ihbAtseT'" }
+                text: "What will be the return value of reverseString('hello') if reverseString is defined as:",
+                template: "function reverseString(str) {\n    return str.split('').reverse().join('');\n}",
+                options: [
+                    "'olleh'",
+                    "'hello'",
+                    "'loleh'",
+                    "'hlelo'"
                 ],
+                answer: 0,
                 explanation: "Strings can be split into an array, reversed, and joined back together: str.split('').reverse().join('')"
             },
             {
                 id: "c2",
                 type: "code",
-                text: "Write a function named 'isEven(num)' that returns true if a number is even, and false otherwise.",
-                template: "function isEven(num) {\n    // Write your code here\n    \n}",
-                assertions: [
-                    { input: [4], expected: "true" },
-                    { input: [7], expected: "false" }
+                text: "What will be the return value of isEven(7) if isEven is defined as:",
+                template: "function isEven(num) {\n    return num % 2 === 0;\n}",
+                options: [
+                    "true",
+                    "false",
+                    "undefined",
+                    "null"
                 ],
-                explanation: "Use the modulo operator: return num % 2 === 0;"
+                answer: 1,
+                explanation: "7 % 2 is 1, which does not equal 0, so it returns false."
             }
         ]
     },

@@ -1262,13 +1262,11 @@ export function renderAdminDashboard(user) {
                     });
                 } else {
                     list.push({
-                        text: "Write a React helper function named 'getBadgeStyle(score)' that returns 'badge-success' if the score is 80 or above, and 'badge-danger' otherwise.",
+                        text: "What will getBadgeStyle(85) return if defined as:",
                         type: 'code',
-                        template: "function getBadgeStyle(score) {\n    // Write your code here\n    \n}",
-                        assertions: [
-                            { input: [85], expected: "'badge-success'" },
-                            { input: [50], expected: "'badge-danger'" }
-                        ],
+                        template: "function getBadgeStyle(score) {\n    return score >= 80 ? 'badge-success' : 'badge-danger';\n}",
+                        options: ["'badge-success'", "'badge-danger'", "'badge-warning'", "null"],
+                        answer: 0,
                         explanation: "Returns styling tag strings based on simple logic bounds."
                     });
                 }
@@ -1301,13 +1299,11 @@ export function renderAdminDashboard(user) {
                     });
                 } else {
                     list.push({
-                        text: "Write a function named 'reverseString(str)' that accepts a string and returns it reversed.",
+                        text: "What will reverseString('hello') return if defined as:",
                         type: 'code',
-                        template: "function reverseString(str) {\n    // Write your code here\n    \n}",
-                        assertions: [
-                            { input: ["'hello'"], expected: "'olleh'" },
-                            { input: ["'TestAbhi'"], expected: "'ihbAtseT'" }
-                        ],
+                        template: "function reverseString(str) {\n    return str.split('').reverse().join('');\n}",
+                        options: ["'olleh'", "'hello'", "'loleh'", "'hlelo'"],
+                        answer: 0,
                         explanation: "Split code, reverse, and join."
                     });
                 }
@@ -1340,13 +1336,11 @@ export function renderAdminDashboard(user) {
                     });
                 } else {
                     list.push({
-                        text: "Write a function named 'getContinent(country)' that returns 'Asia' if the country is 'India' or 'China', and 'Europe' otherwise.",
+                        text: "What will getContinent('India') return if defined as:",
                         type: 'code',
-                        template: "function getContinent(country) {\n    // Write your code here\n    \n}",
-                        assertions: [
-                            { input: ["'India'"], expected: "'Asia'" },
-                            { input: ["'France'"], expected: "'Europe'" }
-                        ],
+                        template: "function getContinent(country) {\n    return (country === 'India' || country === 'China') ? 'Asia' : 'Europe';\n}",
+                        options: ["'Asia'", "'Europe'", "'Africa'", "'America'"],
+                        answer: 0,
                         explanation: "Condition checks on country string arguments."
                     });
                 }
@@ -1382,13 +1376,11 @@ export function renderAdminDashboard(user) {
                 } else {
                     // Generate a simple math or logic code question related to the topic
                     list.push({
-                        text: `Write a validator function named 'check${capitalized.replace(/[^a-zA-Z0-9]/g, '')}(value)' that returns true if the input value is positive (greater than 0), and false otherwise.`,
+                        text: `What will check${capitalized.replace(/[^a-zA-Z0-9]/g, '')}(10) return if defined as:`,
                         type: 'code',
-                        template: `function check${capitalized.replace(/[^a-zA-Z0-9]/g, '')}(value) {\n    // Write your code here\n    \n}`,
-                        assertions: [
-                            { input: [10], expected: "true" },
-                            { input: [-5], expected: "false" }
-                        ],
+                        template: `function check${capitalized.replace(/[^a-zA-Z0-9]/g, '')}(value) {\n    return value > 0;\n}`,
+                        options: ["true", "false", "undefined", "null"],
+                        answer: 0,
                         explanation: `Returns true if value > 0, false otherwise.`
                     });
                 }
