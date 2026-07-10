@@ -208,6 +208,7 @@ export function renderTestResults(attempt, onBackToDashboard) {
                                         </div>
                                     ` : ''}
                                 </div>
+                            `;
                         } else if (q.type === 'code') {
                             const isMatch = q.isCorrect;
                             answerDetailHtml = `
