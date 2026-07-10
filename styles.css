@@ -1018,6 +1018,7 @@ h1, h2, h3, h4, h5, h6 {
     height: 100vh;
     position: sticky;
     top: 0;
+    overflow-y: auto;
 }
 
 .test-sidebar-section h3 {
@@ -3531,4 +3532,63 @@ body:not(.taking-test) .webcam-container {
 .approve-faculty-btn:active:not(:disabled) {
     transform: translateY(1px);
 }
+
+.embedded-code-block {
+    background-color: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius-sm);
+    padding: 0.85rem 1.15rem;
+    font-family: monospace;
+    font-size: 0.85rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+    line-height: 1.5;
+    white-space: pre;
+    word-break: normal;
+    color: var(--text-primary);
+}
+
+[data-theme="light"] .embedded-code-block {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* Responsive adjustments for newly added exam creation and code rendering features */
+@media (max-width: 480px) {
+    .ai-generator-panel {
+        padding: 1.25rem !important;
+        margin-bottom: 1.25rem !important;
+        gap: 1rem !important;
+    }
+    .embedded-code-block {
+        font-size: 0.78rem !important;
+        padding: 0.65rem 0.85rem !important;
+        margin: 0.5rem 0 !important;
+    }
+    .modal-content {
+        padding: 1.5rem !important;
+    }
+    /* Buttons layout in test creator sidebar */
+    #add-question-btn, 
+    #import-questions-json-btn, 
+    #save-test-btn {
+        flex: 1 1 100% !important;
+        margin-bottom: 0.25rem !important;
+    }
+    #questions-json-help-btn {
+        flex: 1 1 100% !important;
+        width: 100% !important;
+        justify-content: center !important;
+    }
+    /* Code assertion item responsive list */
+    .code-assertion-item {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 0.4rem !important;
+    }
+    .code-assertion-status {
+        align-self: flex-end !important;
+    }
+}
+
+
 

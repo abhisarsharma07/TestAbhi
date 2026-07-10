@@ -78,3 +78,50 @@ export function formatDate(isoString) {
         minute: '2-digit'
     });
 }
+
+/**
+ * Format question text to render code snippets beautifully inside pre/code blocks.
+ * Escapes HTML characters (e.g. angle brackets) first to prevent browser rendering issues.
+ */
+export function formatQuestionText(text) {
+    if (!text) return "";
+    
+    // Check if the text contains code wrapped in triple-backticks
+    const codeBlockRegex = /```(?:[a-zA-Z0-9+#-]+)?\n([\s\S]*?)\n```/g;
+    if (codeBlockRegex.test(text)) {
+        return text.replace(codeBlockRegex, (match, code) => {
+            return `<pre class="embedded-code-block"><code>${escapeHtml(code)}</code></pre>`;
+        }).replace(/\n/g, "<br>");
+    }
+
+    // Heuristically detect formatting blocks of code if no backticks are present
+    const lines = text.split("\n");
+    let insideCode = false;
+    let htmlOut = "";
+    let codeBlock = [];
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const isCodeLine = /^\s*(#include|int\s+main|char\s+|float\s+|double\s+|using\s+namespace|printf|scanf|cout|cin|std::|public\s+class|public\s+static\s+void|system\.out|import\s+|def\s+|elif\s+|print\(|class\s+[A-Za-z0-9_]+\s*[:{]|\{|\}|\/\/|#|<html>|<head>|<body>|div\s*\{|p\s*\{|\.[\w-]+\s*\{|#[\w-]+\s*\{|const\s+\w+\s*=|let\s+\w+\s*=)/.test(line) 
+            || (insideCode && line.trim() !== "" && !/^[A-D]\)/.test(line.trim()));
+
+        if (isCodeLine) {
+            if (!insideCode) {
+                insideCode = true;
+            }
+            codeBlock.push(line);
+        } else {
+            if (insideCode) {
+                htmlOut += `<pre class="embedded-code-block"><code>${escapeHtml(codeBlock.join("\n"))}</code></pre>`;
+                codeBlock = [];
+                insideCode = false;
+            }
+            htmlOut += escapeHtml(line) + "<br>";
+        }
+    }
+    if (insideCode && codeBlock.length > 0) {
+        htmlOut += `<pre class="embedded-code-block"><code>${escapeHtml(codeBlock.join("\n"))}</code></pre>`;
+    }
+    return htmlOut;
+}
+

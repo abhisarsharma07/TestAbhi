@@ -494,21 +494,95 @@ export function renderAdminDashboard(user) {
                                 normalized.options = item.options.map(String);
                                 
                                 if (item.type === 'single') {
-                                    const ansIdx = parseInt(item.answer, 10);
-                                    if (isNaN(ansIdx) || ansIdx < 0 || ansIdx >= normalized.options.length) {
-                                        throw new Error(`Question #${idx + 1} (single-choice) must have a valid numerical 0-indexed 'answer' field.`);
+                                    const rawAns = item.answer !== undefined ? item.answer : (Array.isArray(item.answers) ? item.answers[0] : 0);
+                                    let ansIdx = -1;
+                                    
+                                    // Try direct number check
+                                    const parsedNum = parseInt(rawAns, 10);
+                                    if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < normalized.options.length) {
+                                        ansIdx = parsedNum;
+                                    } else {
+                                        // Try string checks
+                                        const cleanAns = String(rawAns).trim();
+                                        
+                                        // Check 1: single letter match A, B, C, D...
+                                        const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^Answer:\s*\(([A-Z])\)$|^\(([A-Z])\)$/);
+                                        if (letterMatch) {
+                                            const letter = letterMatch[1] || letterMatch[2] || letterMatch[3];
+                                            const computedIdx = letter.charCodeAt(0) - 65; // 'A' is 65
+                                            if (computedIdx >= 0 && computedIdx < normalized.options.length) {
+                                                ansIdx = computedIdx;
+                                            }
+                                        }
+                                        
+                                        // Check 2: exact match in options (case insensitive)
+                                        if (ansIdx === -1) {
+                                            const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
+                                            if (matchedOptionIdx !== -1) {
+                                                ansIdx = matchedOptionIdx;
+                                            }
+                                        }
+                                        
+                                        // Check 3: substring match in options
+                                        if (ansIdx === -1) {
+                                            const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
+                                            if (matchedOptionIdx !== -1) {
+                                                ansIdx = matchedOptionIdx;
+                                            }
+                                        }
+                                    }
+                                    
+                                    if (ansIdx === -1) {
+                                        throw new Error(`Question #${idx + 1} (single-choice) has an invalid answer value: "${rawAns}". Cannot match with options.`);
                                     }
                                     normalized.answer = ansIdx;
                                 } else {
-                                    if (!Array.isArray(item.answers)) {
-                                        throw new Error(`Question #${idx + 1} (multi-choice) must have an 'answers' array of option indexes.`);
+                                    const rawAnswers = Array.isArray(item.answers) ? item.answers : (item.answer !== undefined ? [item.answer] : []);
+                                    if (rawAnswers.length === 0) {
+                                        throw new Error(`Question #${idx + 1} (multi-choice) must have an 'answers' array of options.`);
                                     }
-                                    normalized.answers = item.answers.map(ans => {
-                                        const parsedAns = parseInt(ans, 10);
-                                        if (isNaN(parsedAns) || parsedAns < 0 || parsedAns >= normalized.options.length) {
-                                            throw new Error(`Question #${idx + 1} (multi-choice) answer "${ans}" is invalid.`);
+                                    
+                                    normalized.answers = rawAnswers.map(rawAns => {
+                                        let ansIdx = -1;
+                                        
+                                        // Try direct number check
+                                        const parsedNum = parseInt(rawAns, 10);
+                                        if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < normalized.options.length) {
+                                            ansIdx = parsedNum;
+                                        } else {
+                                            const cleanAns = String(rawAns).trim();
+                                            
+                                            // Check 1: single letter match A, B, C, D...
+                                            const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^Answer:\s*\(([A-Z])\)$|^\(([A-Z])\)$/);
+                                            if (letterMatch) {
+                                                const letter = letterMatch[1] || letterMatch[2] || letterMatch[3];
+                                                const computedIdx = letter.charCodeAt(0) - 65;
+                                                if (computedIdx >= 0 && computedIdx < normalized.options.length) {
+                                                    ansIdx = computedIdx;
+                                                }
+                                            }
+                                            
+                                            // Check 2: exact match in options (case insensitive)
+                                            if (ansIdx === -1) {
+                                                const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
+                                                if (matchedOptionIdx !== -1) {
+                                                    ansIdx = matchedOptionIdx;
+                                                }
+                                            }
+                                            
+                                            // Check 3: substring match
+                                            if (ansIdx === -1) {
+                                                const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
+                                                if (matchedOptionIdx !== -1) {
+                                                    ansIdx = matchedOptionIdx;
+                                                }
+                                            }
                                         }
-                                        return parsedAns;
+                                        
+                                        if (ansIdx === -1) {
+                                            throw new Error(`Question #${idx + 1} (multi-choice) has an invalid answer value: "${rawAns}". Cannot match with options.`);
+                                        }
+                                        return ansIdx;
                                     });
                                 }
                             } else if (item.type === 'text') {
@@ -1308,7 +1382,7 @@ export function renderAdminDashboard(user) {
 
                 <div class="input-group">
                     <label>Question Body</label>
-                    <input type="text" class="input-control q-text-input" data-index="${qIdx}" value="${q.text}" placeholder="What is the output of 2 + 2?" required>
+                    <textarea class="input-control q-text-textarea" data-index="${qIdx}" rows="3" placeholder="Enter question text... (Supports multiple lines & code snippets)" required>${q.text}</textarea>
                 </div>
 
                 <div class="question-config-grid">
@@ -1547,7 +1621,7 @@ export function renderAdminDashboard(user) {
             }
 
             // General Card Hooks
-            card.querySelector(".q-text-input").addEventListener("input", (e) => {
+            card.querySelector(".q-text-textarea").addEventListener("input", (e) => {
                 const idx = parseInt(e.target.getAttribute("data-index"), 10);
                 builderQuestions[idx].text = e.target.value;
             });

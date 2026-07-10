@@ -3,7 +3,7 @@
 ------------------------------------------------------------- */
 
 import { addProctorLog } from '../db.js';
-import { formatTime, showToast } from '../utils.js';
+import { formatTime, showToast, formatQuestionText } from '../utils.js';
 
 export function renderTestInterface(user, test, onSubmitTest) {
     const container = document.createElement("div");
@@ -333,7 +333,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
         questionCard.innerHTML = `
             <div class="question-block" style="${q.type === 'code' ? 'max-width: 100%;' : ''}">
                 <div class="question-number">Question ${currentIdx + 1} of ${totalQuestions}</div>
-                <div class="question-text">${q.text}</div>
+                <div class="question-text">${formatQuestionText(q.text)}</div>
                 ${inputHtml}
             </div>
         `;
