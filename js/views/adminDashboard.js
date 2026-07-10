@@ -254,10 +254,14 @@ export function renderAdminDashboard(user) {
                         <i class="fas fa-robot" style="animation: pulse-glow 2s infinite;"></i>
                         <h3>AI Conversational Agent Assistant</h3>
                     </div>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
                         <button class="btn btn-secondary" id="gemini-config-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem; border-color: rgba(6, 182, 212, 0.3); color: hsl(190, 90%, 50%);">
                             <i class="fas fa-key"></i> Gemini API Key
                         </button>
+                        <button class="btn btn-secondary" id="pdf-upload-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; display: flex; align-items: center; gap: 0.25rem; border-color: rgba(239, 68, 68, 0.25); color: hsl(355, 78%, 56%);">
+                            <i class="fas fa-file-pdf"></i> Upload PDF
+                        </button>
+                        <input type="file" id="pdf-file-input" accept=".pdf" style="display: none;">
                         <button class="btn btn-secondary" id="reset-chat-btn" style="padding: 0.35rem 0.75rem; font-size: 0.75rem; border-color: rgba(255,255,255,0.1);">
                             <i class="fas fa-sync-alt"></i> Reset Chat
                         </button>
@@ -482,6 +486,85 @@ export function renderAdminDashboard(user) {
         const chatSendBtn = paneBuilder.querySelector("#ai-chat-send-btn");
         const resetChatBtn = paneBuilder.querySelector("#reset-chat-btn");
         const loadDraftsBtn = paneBuilder.querySelector("#ai-load-drafts-btn");
+        const pdfUploadBtn = paneBuilder.querySelector("#pdf-upload-btn");
+        const pdfFileInput = paneBuilder.querySelector("#pdf-file-input");
+
+        // PDF upload logic
+        if (pdfUploadBtn && pdfFileInput) {
+            pdfUploadBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                const apiKey = localStorage.getItem("testabhi_gemini_key");
+                if (!apiKey) {
+                    showToast("Please save your Gemini API Key first before uploading a PDF.", "warning");
+                    if (keyPanel && keyPanel.style.display === "none") {
+                        keyPanel.style.display = "flex";
+                        keyInput.focus();
+                    }
+                    return;
+                }
+                pdfFileInput.click();
+            });
+
+            pdfFileInput.addEventListener("change", async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                if (file.type !== "application/pdf") {
+                    showToast("Invalid file format. Please upload a PDF.", "error");
+                    return;
+                }
+
+                chatHistory.push({ sender: 'user', text: `Uploaded PDF: **${file.name}** (${Math.round(file.size / 1024)} KB). Extracting questions...` });
+                chatHistory.push({ sender: 'agent', isTyping: true });
+                renderChatMessages();
+
+                const apiKey = localStorage.getItem("testabhi_gemini_key");
+
+                try {
+                    const extractedText = await extractTextFromPDF(file);
+                    if (!extractedText.trim()) {
+                        throw new Error("No readable text content found inside the PDF.");
+                    }
+
+                    const prompt = `The user has uploaded a PDF document containing exam questions. Please analyze the following extracted text, search for all questions, and parse them completely. Fill in the options, correct answer keys, and logical explanations. Output raw JSON matching the required schema.\n\n[EXTRACTED PDF TEXT]:\n${extractedText}`;
+                    
+                    const geminiResponse = await callGeminiAPI(apiKey, prompt);
+                    chatHistory = chatHistory.filter(m => !m.isTyping);
+
+                    if (geminiResponse && Array.isArray(geminiResponse.questions)) {
+                        proposedQuestionsList = geminiResponse.questions;
+                        proposedSectionsList = geminiResponse.sections || [];
+                        chatTopic = geminiResponse.chatTopic || file.name.replace(".pdf", "");
+                        chatCount = geminiResponse.questions.length;
+                        chatPhase = 2; // Ready to load
+                        
+                        let parsedSummary = `Successfully parsed **${geminiResponse.questions.length}** questions from your PDF!`;
+                        if (proposedSectionsList.length > 0) {
+                            parsedSummary += `\n\n**Sections Identified:**\n` + 
+                                proposedSectionsList.map(s => `- **${s.name}** (${s.duration} mins)`).join('\n');
+                        }
+                        parsedSummary += `\n\nClick the **Load Proposed Questions into Editor** button below to inspect and customize them.`;
+
+                        chatHistory.push({ 
+                            sender: 'agent', 
+                            text: geminiResponse.reply || parsedSummary 
+                        });
+                    } else {
+                        throw new Error("Invalid question structure returned by Gemini API.");
+                    }
+                } catch (err) {
+                    console.error("PDF Parsing/Gemini Error: ", err);
+                    chatHistory = chatHistory.filter(m => !m.isTyping);
+                    chatHistory.push({ 
+                        sender: 'agent', 
+                        text: `⚠️ **PDF Question Extraction Failed:** ${err.message}\n\nPlease check your file or Gemini API Key and try again.` 
+                    });
+                }
+
+                pdfFileInput.value = '';
+                renderChatMessages();
+            });
+        }
 
         const processLocalLogic = (userText) => {
             let reply = '';
@@ -1743,4 +1826,36 @@ The JSON structure must match this EXACT schema:
     }
 
     throw lastError || new Error("Failed to connect to Gemini API. Please check your API key or connection.");
+}
+
+// Extract text from a PDF file using pdf.js client-side
+async function extractTextFromPDF(file) {
+    if (!window.pdfjsLib) {
+        await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js';
+            script.onload = () => {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+                resolve();
+            };
+            script.onerror = () => reject(new Error("Failed to load PDF parsing library."));
+            document.head.appendChild(script);
+        });
+    } else {
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const loadingTask = window.pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    let fullText = '';
+    
+    for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + '\n';
+    }
+    
+    return fullText;
 }

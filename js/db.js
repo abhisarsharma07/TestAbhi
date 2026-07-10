@@ -659,3 +659,14 @@ export async function fetchLeaderboard(testId) {
     return entries;
 }
 
+// Delete user account (admin action)
+export async function deleteUser(username) {
+    const cleanUsername = username.toLowerCase().trim();
+    if (cache.users[cleanUsername]) {
+        delete cache.users[cleanUsername];
+    }
+    const userRef = doc(db, 'users', cleanUsername);
+    await deleteDoc(userRef);
+}
+
+

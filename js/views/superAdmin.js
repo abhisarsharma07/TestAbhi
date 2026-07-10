@@ -1,4 +1,4 @@
-import { getUsers, saveUsers, fetchAllUsers, approveFaculty } from '../db.js';
+import { getUsers, saveUsers, fetchAllUsers, approveFaculty, deleteUser } from '../db.js';
 import { showToast } from '../utils.js';
 
 export function renderSuperAdminDashboard(currentUser) {
@@ -53,18 +53,32 @@ export function renderSuperAdminDashboard(currentUser) {
             ${pendingFaculty.length > 0 ? `
             <div class="approval-banner">
                 <div class="approval-banner-header">
-                    <i class="fas fa-user-clock"></i>
-                    <span>${pendingFaculty.length} Faculty Account${pendingFaculty.length > 1 ? 's' : ''} Awaiting Approval</span>
+                    <i class="fas fa-shield-alt"></i>
+                    <span>System Access Approvals Required: ${pendingFaculty.length} Faculty Request${pendingFaculty.length > 1 ? 's' : ''}</span>
                 </div>
                 <div class="approval-list">
                     ${pendingFaculty.map(u => `
                         <div class="approval-card">
-                            <div class="approval-info">
-                                <div class="approval-name">${u.name}</div>
-                                <div class="approval-meta">@${u.username} &middot; Faculty</div>
+                            <div style="display: flex; align-items: center; gap: 1rem;">
+                                <div style="
+                                    background: rgba(139, 92, 246, 0.12);
+                                    color: hsl(263, 90%, 65%);
+                                    border: 1px solid rgba(139, 92, 246, 0.2);
+                                    width: 44px; height: 44px; border-radius: 50%;
+                                    display: flex; align-items: center; justify-content: center;
+                                    font-size: 1.1rem;
+                                ">
+                                    <i class="fas fa-user-tie"></i>
+                                </div>
+                                <div class="approval-info">
+                                    <div class="approval-name">${u.name}</div>
+                                    <div class="approval-meta">
+                                        <i class="fas fa-at" style="font-size: 0.75rem; color: var(--text-muted);"></i> @${u.username} &middot; <span style="color: hsl(263, 90%, 65%); font-weight: 600;">Faculty Access Request</span>
+                                    </div>
+                                </div>
                             </div>
-                            <button class="btn btn-primary approve-faculty-btn" data-username="${u.username}" style="padding: 0.4rem 1rem; font-size: 0.8rem; white-space: nowrap;">
-                                <i class="fas fa-check-circle"></i> Approve
+                            <button class="btn approve-faculty-btn" data-username="${u.username}">
+                                <i class="fas fa-check-circle"></i> Approve Access
                             </button>
                         </div>
                     `).join('')}
@@ -165,11 +179,13 @@ export function renderSuperAdminDashboard(currentUser) {
             btn.addEventListener("click", () => {
                 const targetUser = btn.dataset.username;
                 showDeleteConfirmationModal(targetUser, async () => {
-                    const activeUsers = getUsers();
-                    delete activeUsers[targetUser];
-                    await saveUsers(activeUsers);
-                    showToast(`User @${targetUser} deleted from directory.`, "success");
-                    renderPanel();
+                    try {
+                        await deleteUser(targetUser);
+                        showToast(`User @${targetUser} deleted from directory.`, "success");
+                        renderPanel();
+                    } catch (e) {
+                        showToast(`Failed to delete user: ${e.message}`, "error");
+                    }
                 });
             });
         });

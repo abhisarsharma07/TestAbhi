@@ -3426,3 +3426,109 @@ body:not(.taking-test) .webcam-container {
         right: 1rem !important;
     }
 }
+
+/* =============================================================
+   Super Admin - Beautified Teacher Approval UI
+   ============================================================= */
+.approval-banner {
+    background: linear-gradient(135deg, hsla(263, 90%, 51%, 0.08) 0%, hsla(186, 94%, 43%, 0.08) 100%);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: var(--border-radius-md);
+    padding: 1.75rem;
+    margin: 1.5rem 0 2rem 0;
+    box-shadow: 0 8px 32px 0 rgba(139, 92, 246, 0.08);
+    backdrop-filter: var(--glass-backdrop);
+    transition: all var(--transition-smooth);
+}
+
+.approval-banner:hover {
+    box-shadow: 0 8px 32px 0 rgba(139, 92, 246, 0.16);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.approval-banner-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding-bottom: 0.75rem;
+}
+
+.approval-banner-header i {
+    color: hsl(190, 90%, 50%);
+    text-shadow: 0 0 8px rgba(6, 182, 212, 0.4);
+}
+
+.approval-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 1.25rem;
+}
+
+.approval-card {
+    background: var(--bg-card);
+    border: var(--glass-border);
+    border-radius: var(--border-radius-sm);
+    padding: 1.25rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    transition: all var(--transition-fast);
+}
+
+.approval-card:hover {
+    transform: translateY(-3px);
+    background: var(--bg-card-hover);
+    border-color: rgba(6, 182, 212, 0.3);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.approval-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.approval-name {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.approval-meta {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.approval-meta i {
+    color: hsl(263, 90%, 65%);
+}
+
+.approve-faculty-btn {
+    background: var(--success-gradient);
+    border: none;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+    transition: all var(--transition-fast);
+}
+
+.approve-faculty-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    opacity: 0.95;
+}
+
+.approve-faculty-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
