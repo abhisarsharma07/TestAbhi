@@ -348,6 +348,7 @@ export function renderTestInterface(user, test, onSubmitTest) {
                 renderSidebarGrid();
             });
         }
+    }
 
     function renderSidebarGrid() {
         sidebarGrid.innerHTML = '';

@@ -125,13 +125,13 @@ export function renderTestResults(attempt, onBackToDashboard) {
 
                         let answerDetailHtml = '';
 
-                        if (q.type === 'single' || q.type === 'code') {
+                        if (q.type === 'single' || (q.type === 'code' && q.options)) {
                             answerDetailHtml = `
                                 <div class="review-details">
                                     ${q.type === 'code' && q.template ? `<pre class="embedded-code-block" style="margin-bottom: 1rem; max-width: 100%;"><code>${escapeHtml(q.template)}</code></pre>` : ''}
                                     <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Options:</div>
                                     <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem;">
-                                        ${q.options.map((opt, oIdx) => {
+                                        ${(q.options || []).map((opt, oIdx) => {
                                             const isSelected = q.studentAnswer === oIdx;
                                             const isCorrectOpt = q.correctAnswer === oIdx;
                                             let classStyle = '';
@@ -208,8 +208,17 @@ export function renderTestResults(attempt, onBackToDashboard) {
                                         </div>
                                     ` : ''}
                                 </div>
+                        } else if (q.type === 'code') {
+                            const isMatch = q.isCorrect;
+                            answerDetailHtml = `
+                                <div class="review-details">
+                                    <div class="review-answer-line ${isMatch ? 'user-answer correct-match' : 'user-answer'}" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem; background-color: #0b0f19; color: #72f1b8; padding: 1rem; border-radius: var(--border-radius-sm);">
+                                        <strong style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.35rem; font-family: var(--font-body);">Your Solution:</strong>
+                                        <code>${escapeHtml(q.studentAnswer || '// No solution submitted')}</code>
+                                    </div>
+                                </div>
                             `;
-
+                        }
 
                         return `
                             <div class="review-item ${statusClass}">
