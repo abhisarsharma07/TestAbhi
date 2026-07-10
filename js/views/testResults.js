@@ -2,7 +2,7 @@
    TestAbhi - Test Results & Analytics Review View
 ------------------------------------------------------------- */
 
-import { formatTime } from '../utils.js';
+import { formatTime, escapeHtml } from '../utils.js';
 
 export function renderTestResults(attempt, onBackToDashboard) {
     const container = document.createElement("div");
@@ -125,36 +125,40 @@ export function renderTestResults(attempt, onBackToDashboard) {
 
                         let answerDetailHtml = '';
 
-                        if (q.type === 'single') {
+                        if (q.type === 'single' || q.type === 'code') {
                             answerDetailHtml = `
                                 <div class="review-details">
-                                    ${q.options.map((opt, oIdx) => {
-                                        const isSelected = q.studentAnswer === oIdx;
-                                        const isCorrectOpt = q.correctAnswer === oIdx;
-                                        let classStyle = '';
-                                        let iconStyle = '';
+                                    ${q.type === 'code' && q.template ? `<pre class="embedded-code-block" style="margin-bottom: 1rem; max-width: 100%;"><code>${escapeHtml(q.template)}</code></pre>` : ''}
+                                    <div style="font-weight: 500; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">Options:</div>
+                                    <div style="display: flex; flex-direction: column; gap: 0.4rem; margin-bottom: 0.75rem;">
+                                        ${q.options.map((opt, oIdx) => {
+                                            const isSelected = q.studentAnswer === oIdx;
+                                            const isCorrectOpt = q.correctAnswer === oIdx;
+                                            let classStyle = '';
+                                            let iconStyle = '';
 
-                                        if (isSelected && isCorrectOpt) {
-                                            classStyle = 'class="review-answer-line user-answer correct-match"';
-                                            iconStyle = '<i class="fas fa-check-circle" style="color: hsl(142, 70%, 45%); margin-right: 0.5rem;"></i>';
-                                        } else if (isSelected && !isCorrectOpt) {
-                                            classStyle = 'class="review-answer-line user-answer"';
-                                            iconStyle = '<i class="fas fa-times-circle" style="color: hsl(355, 78%, 56%); margin-right: 0.5rem;"></i>';
-                                        } else if (isCorrectOpt) {
-                                            classStyle = 'class="review-answer-line" style="background-color: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.2);"';
-                                            iconStyle = '<i class="far fa-check-circle" style="color: hsl(142, 70%, 45%); margin-right: 0.5rem;"></i>';
-                                        } else {
-                                            classStyle = 'class="review-answer-line"';
-                                            iconStyle = '<i class="far fa-circle" style="color: var(--text-muted); margin-right: 0.5rem;"></i>';
-                                        }
+                                            if (isSelected && isCorrectOpt) {
+                                                classStyle = 'class="review-answer-line user-answer correct-match"';
+                                                iconStyle = '<i class="fas fa-check-circle" style="color: hsl(142, 70%, 45%); margin-right: 0.5rem;"></i>';
+                                            } else if (isSelected && !isCorrectOpt) {
+                                                classStyle = 'class="review-answer-line user-answer"';
+                                                iconStyle = '<i class="fas fa-times-circle" style="color: hsl(355, 78%, 56%); margin-right: 0.5rem;"></i>';
+                                            } else if (isCorrectOpt) {
+                                                classStyle = 'class="review-answer-line" style="background-color: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.2);"';
+                                                iconStyle = '<i class="far fa-check-circle" style="color: hsl(142, 70%, 45%); margin-right: 0.5rem;"></i>';
+                                            } else {
+                                                classStyle = 'class="review-answer-line"';
+                                                iconStyle = '<i class="far fa-circle" style="color: var(--text-muted); margin-right: 0.5rem;"></i>';
+                                            }
 
-                                        return `
-                                            <div ${classStyle}>
-                                                ${iconStyle}
-                                                <span>${opt}</span>
-                                            </div>
-                                        `;
-                                    }).join('')}
+                                            return `
+                                                <div ${classStyle}>
+                                                    ${iconStyle}
+                                                    <span>${opt}</span>
+                                                </div>
+                                            `;
+                                        }).join('')}
+                                    </div>
                                 </div>
                             `;
                         } else if (q.type === 'multi') {
@@ -205,17 +209,7 @@ export function renderTestResults(attempt, onBackToDashboard) {
                                     ` : ''}
                                 </div>
                             `;
-                        } else if (q.type === 'code') {
-                            const isMatch = q.isCorrect;
-                            answerDetailHtml = `
-                                <div class="review-details">
-                                    <div class="review-answer-line ${isMatch ? 'user-answer correct-match' : 'user-answer'}" style="font-family: monospace; white-space: pre-wrap; font-size: 0.85rem; background-color: #0b0f19; color: #72f1b8; padding: 1rem; border-radius: var(--border-radius-sm);">
-                                        <strong style="font-size: 0.8rem; color: var(--text-secondary); display: block; margin-bottom: 0.35rem; font-family: var(--font-body);">Your Solution:</strong>
-                                        <code>${q.studentAnswer || '// No solution submitted'}</code>
-                                    </div>
-                                </div>
-                            `;
-                        }
+
 
                         return `
                             <div class="review-item ${statusClass}">

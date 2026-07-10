@@ -565,16 +565,17 @@ export function renderTestInterface(user, test, onSubmitTest) {
                     type: q.type
                 });
             } else if (q.type === 'code') {
-                isAttempted = studentAns !== undefined && studentAns !== '';
+                isAttempted = studentAns !== '' && studentAns !== undefined && studentAns !== null;
                 isCorrect = studentAns === q.answer;
                 reviewDetails.push({
                     questionText: q.text,
                     options: q.options,
-                    correctAnswer: q.options[q.answer] || 'Unknown',
-                    studentAnswer: (studentAns !== undefined && studentAns !== '') ? (q.options[studentAns] || 'Unknown') : 'Not Attempted',
+                    correctAnswer: q.answer,
+                    studentAnswer: studentAns,
                     isCorrect,
                     explanation: q.explanation,
-                    type: q.type
+                    type: q.type,
+                    template: q.template || ''
                 });
             }
 

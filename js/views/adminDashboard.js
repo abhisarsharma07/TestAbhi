@@ -591,13 +591,50 @@ export function renderAdminDashboard(user) {
                                 }
                                 normalized.answer = String(item.answer);
                             } else if (item.type === 'code') {
+                                if (!Array.isArray(item.options) || item.options.length < 2) {
+                                    throw new Error(`Question #${idx + 1} (code snippet choice) must have an 'options' array with at least 2 choices.`);
+                                }
+                                normalized.options = item.options.map(String);
                                 normalized.language = item.language ? String(item.language) : 'JavaScript';
                                 normalized.template = item.template ? String(item.template) : '';
-                                normalized.assertions = Array.isArray(item.assertions) ? item.assertions.map(as => ({
-                                    input: Array.isArray(as.input) ? as.input.map(String) : [String(as.input)],
-                                    expected: String(as.expected)
-                                })) : [];
-                                normalized.answer = '';
+                                
+                                const rawAns = item.answer;
+                                if (rawAns === undefined || rawAns === null) {
+                                    throw new Error(`Question #${idx + 1} (code snippet choice) must have a correct 'answer' index or option text.`);
+                                }
+                                
+                                let ansIdx = -1;
+                                const parsedNum = parseInt(rawAns, 10);
+                                if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < normalized.options.length) {
+                                    ansIdx = parsedNum;
+                                } else {
+                                    const cleanAns = String(rawAns).trim();
+                                    const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^Answer:\s*\(([A-Z])\)$|^\(([A-Z])\)$/);
+                                    if (letterMatch) {
+                                        const letter = letterMatch[1] || letterMatch[2] || letterMatch[3];
+                                        const computedIdx = letter.charCodeAt(0) - 65;
+                                        if (computedIdx >= 0 && computedIdx < normalized.options.length) {
+                                            ansIdx = computedIdx;
+                                        }
+                                    }
+                                    if (ansIdx === -1) {
+                                        const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
+                                        if (matchedOptionIdx !== -1) {
+                                            ansIdx = matchedOptionIdx;
+                                        }
+                                    }
+                                    if (ansIdx === -1) {
+                                        const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
+                                        if (matchedOptionIdx !== -1) {
+                                            ansIdx = matchedOptionIdx;
+                                        }
+                                    }
+                                }
+                                
+                                if (ansIdx === -1) {
+                                    throw new Error(`Question #${idx + 1} (code snippet choice) has an invalid answer value: "${rawAns}". Cannot match with options.`);
+                                }
+                                normalized.answer = ansIdx;
                             }
 
                             validated.push(normalized);
@@ -1808,12 +1845,10 @@ export function renderAdminDashboard(user) {
                 showToast(`Question #${i + 1} details are empty`, "error");
                 return;
             }
-            if (q.type === 'text' || q.type === 'code') {
-                if (q.type === 'text') {
-                    if (typeof q.answer !== 'string' || !q.answer.trim()) {
-                        showToast(`Provide a correct answer string for Question #${i + 1}`, "error");
-                        return;
-                    }
+            if (q.type === 'text') {
+                if (typeof q.answer !== 'string' || !q.answer.trim()) {
+                    showToast(`Provide a correct answer string for Question #${i + 1}`, "error");
+                    return;
                 }
             } else {
                 // Choice validation
