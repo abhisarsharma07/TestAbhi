@@ -3,7 +3,7 @@
 ------------------------------------------------------------- */
 
 import { getTests, saveTests, getProctorLogs, fetchAllProctorLogs } from '../db.js';
-import { formatDate, showToast } from '../utils.js';
+import { formatDate, showToast, formatQuestionText } from '../utils.js';
 import { navigate } from '../app.js';
 
 export function renderAdminDashboard(user) {
@@ -1385,6 +1385,15 @@ export function renderAdminDashboard(user) {
                     <textarea class="input-control q-text-textarea" data-index="${qIdx}" rows="3" placeholder="Enter question text... (Supports multiple lines & code snippets)" required>${q.text}</textarea>
                 </div>
 
+                <div class="q-live-preview-box" id="q-preview-${qIdx}" style="background: rgba(0,0,0,0.15); border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); padding: 0.75rem 1rem; margin-bottom: 1rem; ${q.text ? '' : 'display: none;'}">
+                    <span style="font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; font-weight: bold; display: block; margin-bottom: 0.35rem;">
+                        <i class="far fa-eye"></i> Live Question Body Preview
+                    </span>
+                    <div class="preview-content" style="font-size: 0.85rem; color: var(--text-primary); line-height: 1.5;">
+                        ${formatQuestionText(q.text)}
+                    </div>
+                </div>
+
                 <div class="question-config-grid">
                     <div class="input-group">
                         <label>Question Format</label>
@@ -1623,7 +1632,20 @@ export function renderAdminDashboard(user) {
             // General Card Hooks
             card.querySelector(".q-text-textarea").addEventListener("input", (e) => {
                 const idx = parseInt(e.target.getAttribute("data-index"), 10);
-                builderQuestions[idx].text = e.target.value;
+                const textVal = e.target.value;
+                builderQuestions[idx].text = textVal;
+                
+                const previewBox = card.querySelector(`#q-preview-${idx}`);
+                if (previewBox) {
+                    const previewContent = previewBox.querySelector(".preview-content");
+                    if (textVal.trim()) {
+                        previewBox.style.display = "block";
+                        previewContent.innerHTML = formatQuestionText(textVal);
+                    } else {
+                        previewBox.style.display = "none";
+                        previewContent.innerHTML = "";
+                    }
+                }
             });
 
             card.querySelector(".q-explanation-input").addEventListener("input", (e) => {
