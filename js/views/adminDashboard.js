@@ -391,11 +391,18 @@ export function renderAdminDashboard(user) {
                 </p>
                 <div id="builder-questions-list"></div>
 
-                <div style="display: flex; gap: 1rem; width: 100%;">
-                    <button class="btn btn-secondary" id="add-question-btn" style="flex: 1;">
-                        <i class="fas fa-plus-circle"></i> Add Question Card
+                <div style="display: flex; gap: 0.75rem; width: 100%; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="add-question-btn" style="flex: 1; min-width: 140px; justify-content: center;">
+                        <i class="fas fa-plus-circle"></i> Add Question
                     </button>
-                    <button class="btn btn-success" id="save-test-btn" style="flex: 1;">
+                    <button class="btn btn-secondary" id="import-questions-json-btn" style="flex: 1.5; min-width: 160px; justify-content: center; border-color: rgba(6, 182, 212, 0.3); color: hsl(190, 90%, 50%);">
+                        <i class="fas fa-file-import"></i> Import JSON
+                    </button>
+                    <input type="file" id="questions-json-file-input" accept=".json" style="display: none;">
+                    <button class="icon-btn" id="questions-json-help-btn" title="View JSON Schema" style="width: 40px; height: 40px; flex-shrink: 0;">
+                        <i class="fas fa-question-circle"></i>
+                    </button>
+                    <button class="btn btn-success" id="save-test-btn" style="flex: 1.5; min-width: 160px; justify-content: center;">
                         Create Assessment <i class="fas fa-save"></i>
                     </button>
                 </div>
@@ -422,6 +429,119 @@ export function renderAdminDashboard(user) {
                 btn.innerHTML = 'Create Assessment <i class="fas fa-save"></i>';
             }
         });
+
+        // Import Questions JSON Action
+        const importQuestionsBtn = paneBuilder.querySelector("#import-questions-json-btn");
+        const questionsJsonInput = paneBuilder.querySelector("#questions-json-file-input");
+        const helpBtn = paneBuilder.querySelector("#questions-json-help-btn");
+
+        if (helpBtn) {
+            helpBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                showJsonSchemaHelpModal();
+            });
+        }
+
+        if (importQuestionsBtn && questionsJsonInput) {
+            importQuestionsBtn.addEventListener("click", (e) => {
+                e.preventDefault();
+                questionsJsonInput.click();
+            });
+
+            questionsJsonInput.addEventListener("change", (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        let items = [];
+
+                        if (Array.isArray(parsed)) {
+                            items = parsed;
+                        } else if (typeof parsed === 'object' && parsed !== null) {
+                            items = [parsed];
+                        } else {
+                            throw new Error("JSON must be a question object or an array of question objects.");
+                        }
+
+                        // Validate and normalize each question
+                        const validated = [];
+                        items.forEach((item, idx) => {
+                            if (!item.text || !item.type) {
+                                throw new Error(`Question #${idx + 1} is missing required fields (text, type).`);
+                            }
+                            
+                            const validTypes = ['single', 'multi', 'text', 'code'];
+                            if (!validTypes.includes(item.type)) {
+                                throw new Error(`Question #${idx + 1} has an invalid type: "${item.type}". Allowed types: ${validTypes.join(', ')}`);
+                            }
+
+                            // Normalize the question object
+                            const normalized = {
+                                text: String(item.text),
+                                type: item.type,
+                                explanation: item.explanation ? String(item.explanation) : '',
+                                sectionName: item.sectionName ? String(item.sectionName) : (builderSections[0] ? builderSections[0].name : 'General'),
+                                sectionDuration: builderSections[0] ? builderSections[0].duration : 5
+                            };
+
+                            if (item.type === 'single' || item.type === 'multi') {
+                                if (!Array.isArray(item.options) || item.options.length < 2) {
+                                    throw new Error(`Question #${idx + 1} (choice question) must have an options array with at least 2 choices.`);
+                                }
+                                normalized.options = item.options.map(String);
+                                
+                                if (item.type === 'single') {
+                                    const ansIdx = parseInt(item.answer, 10);
+                                    if (isNaN(ansIdx) || ansIdx < 0 || ansIdx >= normalized.options.length) {
+                                        throw new Error(`Question #${idx + 1} (single-choice) must have a valid numerical 0-indexed 'answer' field.`);
+                                    }
+                                    normalized.answer = ansIdx;
+                                } else {
+                                    if (!Array.isArray(item.answers)) {
+                                        throw new Error(`Question #${idx + 1} (multi-choice) must have an 'answers' array of option indexes.`);
+                                    }
+                                    normalized.answers = item.answers.map(ans => {
+                                        const parsedAns = parseInt(ans, 10);
+                                        if (isNaN(parsedAns) || parsedAns < 0 || parsedAns >= normalized.options.length) {
+                                            throw new Error(`Question #${idx + 1} (multi-choice) answer "${ans}" is invalid.`);
+                                        }
+                                        return parsedAns;
+                                    });
+                                }
+                            } else if (item.type === 'text') {
+                                if (item.answer === undefined || item.answer === null) {
+                                    throw new Error(`Question #${idx + 1} (short text entry) must have an 'answer' string.`);
+                                }
+                                normalized.answer = String(item.answer);
+                            } else if (item.type === 'code') {
+                                normalized.language = item.language ? String(item.language) : 'JavaScript';
+                                normalized.template = item.template ? String(item.template) : '';
+                                normalized.assertions = Array.isArray(item.assertions) ? item.assertions.map(as => ({
+                                    input: Array.isArray(as.input) ? as.input.map(String) : [String(as.input)],
+                                    expected: String(as.expected)
+                                })) : [];
+                                normalized.answer = '';
+                            }
+
+                            validated.push(normalized);
+                        });
+
+                        // Add questions and update
+                        builderQuestions.push(...validated);
+                        renderBuilderQuestions();
+                        showToast(`Successfully imported ${validated.length} questions!`, "success");
+
+                    } catch (err) {
+                        showToast(`Import Error: ${err.message}`, "error");
+                    }
+                    questionsJsonInput.value = '';
+                };
+                reader.readAsText(file);
+            });
+        }
 
 
         const checkbox = paneBuilder.querySelector("#test-section-wise-timing");
@@ -1235,6 +1355,41 @@ export function renderAdminDashboard(user) {
                         <input type="text" class="input-control q-correct-text" data-index="${qIdx}" value="${q.answer}" placeholder="Enter the exact correct text answer...">
                     </div>
                 `;
+            } else if (q.type === 'code') {
+                optionsWrapper.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label>Coding Language</label>
+                            <select class="input-control q-lang-select" data-index="${qIdx}" style="cursor: pointer;">
+                                ${['JavaScript', 'Python', 'Java', 'C', 'C++', 'HTML', 'CSS'].map(lang => `
+                                    <option value="${lang}" ${q.language === lang || (!q.language && lang === 'JavaScript') ? 'selected' : ''}>${lang}</option>
+                                `).join('')}
+                            </select>
+                        </div>
+                        <div class="input-group" style="margin-bottom: 0;">
+                            <label>Starter Code Template</label>
+                            <textarea class="input-control q-template-textarea" data-index="${qIdx}" rows="3" style="font-family: monospace; font-size: 0.85rem;" placeholder="// Provide function template signature...">${q.template || ''}</textarea>
+                        </div>
+                    </div>
+                    <label style="font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); display: block; margin-bottom: 0.5rem;">
+                        Assertion Test Cases
+                    </label>
+                    <div class="assertions-inputs-list" style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        ${(q.assertions || []).map((as, aIdx) => `
+                            <div style="display: flex; align-items: center; gap: 0.75rem;">
+                                <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600; min-width: 60px;">Assert #${aIdx + 1}:</span>
+                                <input type="text" class="input-control q-assert-input" data-qindex="${qIdx}" data-aindex="${aIdx}" value="${as.input ? as.input.join(', ') : ''}" placeholder="Inputs (e.g. 2, 3 or 'hello')" style="flex: 2;">
+                                <input type="text" class="input-control q-assert-expected" data-qindex="${qIdx}" data-aindex="${aIdx}" value="${as.expected || ''}" placeholder="Expected Output (e.g. 5 or 'olleh')" style="flex: 1.5;">
+                                <button class="icon-btn remove-assert-item" data-qindex="${qIdx}" data-aindex="${aIdx}" title="Delete Test Case" style="color: hsl(355, 78%, 56%);">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-secondary add-assert-item" data-index="${qIdx}" style="padding: 0.4rem 1rem; font-size: 0.8rem;">
+                        <i class="fas fa-plus"></i> Add Test Case Assertion
+                    </button>
+                `;
             } else {
                 // Radio or Checkbox options
                 optionsWrapper.innerHTML = `
@@ -1282,6 +1437,62 @@ export function renderAdminDashboard(user) {
                 textCorrect.addEventListener("input", (e) => {
                     const qi = parseInt(textCorrect.getAttribute("data-index"), 10);
                     builderQuestions[qi].answer = e.target.value;
+                });
+            }
+
+            // Coding question specific hooks
+            const langSelect = optionsWrapper.querySelector(".q-lang-select");
+            if (langSelect) {
+                langSelect.addEventListener("change", (e) => {
+                    const qi = parseInt(langSelect.getAttribute("data-index"), 10);
+                    builderQuestions[qi].language = e.target.value;
+                });
+            }
+
+            const templateTextarea = optionsWrapper.querySelector(".q-template-textarea");
+            if (templateTextarea) {
+                templateTextarea.addEventListener("input", (e) => {
+                    const qi = parseInt(templateTextarea.getAttribute("data-index"), 10);
+                    builderQuestions[qi].template = e.target.value;
+                });
+            }
+
+            optionsWrapper.querySelectorAll(".q-assert-input").forEach(input => {
+                input.addEventListener("input", (e) => {
+                    const qi = parseInt(input.getAttribute("data-qindex"), 10);
+                    const ai = parseInt(input.getAttribute("data-aindex"), 10);
+                    builderQuestions[qi].assertions[ai].input = e.target.value.split(',').map(s => s.trim());
+                });
+            });
+
+            optionsWrapper.querySelectorAll(".q-assert-expected").forEach(expected => {
+                expected.addEventListener("input", (e) => {
+                    const qi = parseInt(expected.getAttribute("data-qindex"), 10);
+                    const ai = parseInt(expected.getAttribute("data-aindex"), 10);
+                    builderQuestions[qi].assertions[ai].expected = e.target.value;
+                });
+            });
+
+            optionsWrapper.querySelectorAll(".remove-assert-item").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    const qi = parseInt(btn.getAttribute("data-qindex"), 10);
+                    const ai = parseInt(btn.getAttribute("data-aindex"), 10);
+                    builderQuestions[qi].assertions.splice(ai, 1);
+                    renderBuilderQuestions();
+                });
+            });
+
+            const addAssertBtn = optionsWrapper.querySelector(".add-assert-item");
+            if (addAssertBtn) {
+                addAssertBtn.addEventListener("click", (e) => {
+                    e.preventDefault();
+                    const qi = parseInt(addAssertBtn.getAttribute("data-index"), 10);
+                    if (!builderQuestions[qi].assertions) {
+                        builderQuestions[qi].assertions = [];
+                    }
+                    builderQuestions[qi].assertions.push({ input: [''], expected: '' });
+                    renderBuilderQuestions();
                 });
             }
 
@@ -1354,6 +1565,7 @@ export function renderAdminDashboard(user) {
                 } else if (e.target.value === 'multi') {
                     builderQuestions[idx].answers = [];
                 } else if (e.target.value === 'code') {
+                    builderQuestions[idx].language = 'JavaScript';
                     builderQuestions[idx].template = "function reverseString(str) {\n    // Write your code here\n    \n}";
                     builderQuestions[idx].assertions = [{ input: ["'hello'"], expected: "'olleh'" }];
                     builderQuestions[idx].answer = '';
@@ -1586,7 +1798,7 @@ export function renderAdminDashboard(user) {
                 sectionDuration: parseInt(q.sectionDuration, 10) || 5,
                 ...((q.type === 'single' || q.type === 'multi') ? { options: q.options.map(o => o.trim()) } : {}),
                 ...(q.type === 'text' ? { answer: q.answer.trim() } : {}),
-                ...(q.type === 'code' ? { template: q.template || '', assertions: q.assertions || [], answer: '' } : {}),
+                ...(q.type === 'code' ? { language: q.language || 'JavaScript', template: q.template || '', assertions: q.assertions || [], answer: '' } : {}),
                 ...(q.type === 'single' ? { answer: q.answer } : {}),
                 ...(q.type === 'multi' ? { answers: q.answers } : {}),
                 explanation: q.explanation.trim()
@@ -1744,8 +1956,10 @@ export function renderAdminDashboard(user) {
 async function callGeminiAPI(apiKey, promptText) {
     const cleanKey = apiKey.trim();
     const systemInstruction = `You are a helpful AI Assessment Agent for TestAbhi.
-Your task is to parse copy-pasted exam questions or generate new questions based on the user's prompt.
-Analyze the user's text and extract or generate the questions correctly. Fix spelling, capitalization, and formatting anomalies where possible.
+Your task is to parse copy-pasted exam questions or generate new questions based on the user's prompt (such as copy-pasted text or extracted text from a PDF file).
+You must analyze the text very carefully and extract EVERY single question present in the text without missing any.
+Fix spelling, punctuation, capitalization, and formatting anomalies to make the questions look clean and professional.
+For coding questions, automatically identify the language from code syntax or comments, and output it in the 'language' field.
 You must output a single valid JSON object. Do NOT wrap it in markdown code blocks like \`\`\`json. Just output raw JSON.
 The JSON structure must match this EXACT schema:
 {
@@ -1760,7 +1974,8 @@ The JSON structure must match this EXACT schema:
       "answers": [0, 2], // Array of 0-indexed numbers of correct options for 'multi' (ONLY if type is 'multi')
       "explanation": "Why this is correct",
       "sectionName": "Name of the section (e.g. General, Math, coding)",
-      "template": "function template() {}", // ONLY if type is 'code'
+      "template": "starter code template (e.g. function reverseString(str) {})", // ONLY if type is 'code'
+      "language": "JavaScript" | "Python" | "Java" | "C" | "C++" | "HTML" | "CSS", // ONLY if type is 'code'. Detect the target coding language from the question or default to JavaScript.
       "assertions": [{"input": [args], "expected": "output"}] // ONLY if type is 'code'
     }
   ],
@@ -1859,3 +2074,78 @@ async function extractTextFromPDF(file) {
     
     return fullText;
 }
+
+// Display questions JSON schema specification guide modal
+function showJsonSchemaHelpModal() {
+    const overlay = document.createElement("div");
+    overlay.className = "modal-overlay";
+    overlay.innerHTML = `
+        <div class="modal-content" style="max-width: 650px; text-align: left; padding: 2rem;">
+            <div class="modal-title" style="color: hsl(239, 84%, 67%); display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem;">
+                <i class="fas fa-info-circle"></i> Questions JSON Import Schema
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0 1rem 0; line-height: 1.5;">
+                To import questions, upload a <code>.json</code> file containing either a single question object or an array of question objects matching the format below.
+            </p>
+            <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; max-height: 320px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: var(--text-primary); border: 1px solid var(--border-color); line-height: 1.6;">
+                <pre><code id="schema-code-block">[
+  {
+    "text": "What is 2 + 2?",
+    "type": "single",
+    "options": ["3", "4", "5"],
+    "answer": 1,
+    "explanation": "2 + 2 is equal to 4.",
+    "sectionName": "General"
+  },
+  {
+    "text": "Which of these are programming languages?",
+    "type": "multi",
+    "options": ["Python", "HTML", "C++", "JSON"],
+    "answers": [0, 2],
+    "explanation": "Python and C++ are programming languages.",
+    "sectionName": "General"
+  },
+  {
+    "text": "What is the capital of France?",
+    "type": "text",
+    "answer": "Paris",
+    "explanation": "Paris is the capital of France.",
+    "sectionName": "General"
+  },
+  {
+    "text": "Write a function isOdd(n) that checks if n is odd.",
+    "type": "code",
+    "language": "Python",
+    "template": "def isOdd(n):\\n    pass",
+    "assertions": [
+      { "input": ["3"], "expected": "True" },
+      { "input": ["4"], "expected": "False" }
+    ],
+    "explanation": "Use modulo operator.",
+    "sectionName": "Coding"
+  }
+]</code></pre>
+            </div>
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; width: 100%; margin-top: 1.5rem;">
+                <button class="btn btn-secondary" id="modal-help-copy" style="flex: 1; justify-content: center;">
+                    <i class="far fa-copy"></i> Copy Schema
+                </button>
+                <button class="btn btn-primary" id="modal-help-close" style="flex: 1; justify-content: center;">Close</button>
+            </div>
+        </div>
+    `;
+
+    overlay.querySelector("#modal-help-close").addEventListener("click", () => {
+        overlay.remove();
+    });
+
+    overlay.querySelector("#modal-help-copy").addEventListener("click", () => {
+        const codeText = overlay.querySelector("#schema-code-block").innerText;
+        navigator.clipboard.writeText(codeText).then(() => {
+            showToast("Schema copied to clipboard!", "success");
+        });
+    });
+
+    document.body.appendChild(overlay);
+}
+
