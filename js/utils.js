@@ -125,3 +125,147 @@ export function formatQuestionText(text) {
     return htmlOut;
 }
 
+/**
+ * Validate and normalize a raw question object from JSON import.
+ * @param {Object} item - Raw question object
+ * @param {number} idx - Index in list (0-based) for error messages
+ * @returns {Object} Normalized question object
+ * @throws {Error} Detailed error message if validation fails
+ */
+export function validateAndNormalizeQuestion(item, idx = 0) {
+    if (!item || typeof item !== 'object') {
+        throw new Error(`Question #${idx + 1}: Invalid format (must be a JSON object).`);
+    }
+
+    if (!item.text || !String(item.text).trim()) {
+        throw new Error(`Question #${idx + 1}: Missing required field 'text'.`);
+    }
+
+    if (!item.type) {
+        throw new Error(`Question #${idx + 1}: Missing required field 'type'.`);
+    }
+
+    const validTypes = ['single', 'multi', 'text', 'code'];
+    const type = String(item.type).toLowerCase().trim();
+    if (!validTypes.includes(type)) {
+        throw new Error(`Question #${idx + 1}: Invalid type "${item.type}". Allowed types: ${validTypes.join(', ')}.`);
+    }
+
+    const normalized = {
+        text: String(item.text).trim(),
+        type: type,
+        explanation: item.explanation ? String(item.explanation).trim() : '',
+        sectionName: item.sectionName ? String(item.sectionName).trim() : 'General',
+        sectionDuration: item.sectionDuration ? Math.max(1, parseInt(item.sectionDuration, 10) || 5) : 5
+    };
+
+    if (item.id) {
+        normalized.id = String(item.id).trim();
+    }
+
+    // Single choice question
+    if (type === 'single') {
+        if (!Array.isArray(item.options) || item.options.length < 2) {
+            throw new Error(`Question #${idx + 1} (single-choice): Must have an 'options' array with at least 2 choices.`);
+        }
+        normalized.options = item.options.map(o => String(o).trim());
+
+        const rawAns = item.answer !== undefined ? item.answer : (Array.isArray(item.answers) ? item.answers[0] : 0);
+        let ansIdx = parseAnswerIndex(rawAns, normalized.options);
+
+        if (ansIdx === -1) {
+            throw new Error(`Question #${idx + 1} (single-choice): Invalid answer "${rawAns}". Could not match with provided options.`);
+        }
+        normalized.answer = ansIdx;
+
+    // Multiple choice question
+    } else if (type === 'multi') {
+        if (!Array.isArray(item.options) || item.options.length < 2) {
+            throw new Error(`Question #${idx + 1} (multi-choice): Must have an 'options' array with at least 2 choices.`);
+        }
+        normalized.options = item.options.map(o => String(o).trim());
+
+        const rawAnswers = Array.isArray(item.answers) ? item.answers : (item.answer !== undefined ? [item.answer] : []);
+        if (rawAnswers.length === 0) {
+            throw new Error(`Question #${idx + 1} (multi-choice): Must specify an 'answers' array.`);
+        }
+
+        normalized.answers = rawAnswers.map((rawAns, aIdx) => {
+            const ansIdx = parseAnswerIndex(rawAns, normalized.options);
+            if (ansIdx === -1) {
+                throw new Error(`Question #${idx + 1} (multi-choice): Invalid answer #${aIdx + 1} "${rawAns}". Could not match with options.`);
+            }
+            return ansIdx;
+        });
+
+    // Short text question
+    } else if (type === 'text') {
+        if (item.answer === undefined || item.answer === null || String(item.answer).trim() === '') {
+            throw new Error(`Question #${idx + 1} (short-text): Must specify an 'answer' string.`);
+        }
+        normalized.answer = String(item.answer).trim();
+
+    // Code question
+    } else if (type === 'code') {
+        normalized.language = item.language ? String(item.language).trim() : 'JavaScript';
+        normalized.template = item.template ? String(item.template) : '';
+
+        if (Array.isArray(item.options) && item.options.length >= 2) {
+            normalized.options = item.options.map(o => String(o).trim());
+            const rawAns = item.answer !== undefined ? item.answer : 0;
+            const ansIdx = parseAnswerIndex(rawAns, normalized.options);
+            if (ansIdx === -1) {
+                throw new Error(`Question #${idx + 1} (code choice): Invalid answer "${rawAns}". Could not match with options.`);
+            }
+            normalized.answer = ansIdx;
+        } else if (item.answer !== undefined && item.answer !== null) {
+            normalized.answer = String(item.answer).trim();
+        }
+
+        if (Array.isArray(item.assertions)) {
+            normalized.assertions = item.assertions.map(ast => ({
+                input: Array.isArray(ast.input) ? ast.input.map(String) : [String(ast.input || '')],
+                expected: String(ast.expected || '')
+            }));
+        }
+    }
+
+    return normalized;
+}
+
+/**
+ * Helper to match an answer specification (number index, letter like 'A'/'B', or option text) to option array index.
+ */
+function parseAnswerIndex(rawAns, options) {
+    if (rawAns === undefined || rawAns === null) return -1;
+
+    // 1. Direct numeric check
+    const parsedNum = parseInt(rawAns, 10);
+    if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < options.length) {
+        return parsedNum;
+    }
+
+    const cleanAns = String(rawAns).trim();
+
+    // 2. Letter match: A, B, C, D...
+    const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^ANSWER:\s*\(([A-Z])\)$|^\(([A-Z])\)$/i);
+    if (letterMatch) {
+        const letter = (letterMatch[1] || letterMatch[2] || letterMatch[3]).toUpperCase();
+        const computedIdx = letter.charCodeAt(0) - 65;
+        if (computedIdx >= 0 && computedIdx < options.length) {
+            return computedIdx;
+        }
+    }
+
+    // 3. Exact match in options (case insensitive)
+    const exactMatch = options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
+    if (exactMatch !== -1) return exactMatch;
+
+    // 4. Substring match
+    const subMatch = options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
+    if (subMatch !== -1) return subMatch;
+
+    return -1;
+}
+
+

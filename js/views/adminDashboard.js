@@ -2,8 +2,8 @@
    TestAbhi - Admin / Teacher Console & Test Creator
 ------------------------------------------------------------- */
 
-import { getTests, saveTests, getProctorLogs, fetchAllProctorLogs } from '../db.js';
-import { formatDate, showToast, formatQuestionText } from '../utils.js';
+import { getTests, saveTests, getProctorLogs, fetchAllProctorLogs, importQuestionsToExistingTest } from '../db.js';
+import { formatDate, showToast, formatQuestionText, validateAndNormalizeQuestion } from '../utils.js';
 import { navigate } from '../app.js';
 
 export function renderAdminDashboard(user) {
@@ -150,6 +150,9 @@ export function renderAdminDashboard(user) {
                                     <td>${test.questions.length}</td>
                                     <td style="font-family: monospace; font-size: 0.8rem; color: var(--text-muted);">${test.id}</td>
                                     <td style="text-align: right; display: flex; gap: 0.5rem; justify-content: flex-end; align-items: center;">
+                                        <button class="icon-btn import-questions-existing-btn" data-id="${test.id}" title="Import Questions JSON to this Assessment" style="color: hsl(190, 90%, 50%);">
+                                            <i class="fas fa-file-import"></i>
+                                        </button>
                                         <button class="icon-btn export-test-btn" data-id="${test.id}" title="Export Test JSON">
                                             <i class="fas fa-download"></i>
                                         </button>
@@ -164,6 +167,78 @@ export function renderAdminDashboard(user) {
                 </div>
             </div>
         `;
+
+        // Bind Direct Question Import for Existing Assessments
+        let targetTestIdForImport = null;
+        const existingQFileInput = document.createElement("input");
+        existingQFileInput.type = "file";
+        existingQFileInput.accept = ".json";
+        existingQFileInput.style.display = "none";
+        paneAnalytics.appendChild(existingQFileInput);
+
+        paneAnalytics.querySelectorAll(".import-questions-existing-btn").forEach(btn => {
+            btn.addEventListener("click", () => {
+                targetTestIdForImport = btn.getAttribute("data-id");
+                existingQFileInput.click();
+            });
+        });
+
+        existingQFileInput.addEventListener("change", (e) => {
+            const file = e.target.files[0];
+            if (!file || !targetTestIdForImport) return;
+
+            const targetTest = tests.find(t => t.id === targetTestIdForImport);
+            const testTitle = targetTest ? targetTest.title : "Assessment";
+
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                try {
+                    const parsed = JSON.parse(event.target.result);
+                    let rawItems = [];
+
+                    if (Array.isArray(parsed)) {
+                        rawItems = parsed;
+                    } else if (typeof parsed === 'object' && parsed !== null) {
+                        if (Array.isArray(parsed.questions)) {
+                            rawItems = parsed.questions;
+                        } else {
+                            rawItems = [parsed];
+                        }
+                    } else {
+                        throw new Error("Invalid JSON format. Expected a question object or array of question objects.");
+                    }
+
+                    if (rawItems.length === 0) {
+                        throw new Error("JSON file contains no question objects.");
+                    }
+
+                    // Validate each question using standardized validator
+                    const validatedQuestions = [];
+                    rawItems.forEach((item, idx) => {
+                        const norm = validateAndNormalizeQuestion(item, idx);
+                        validatedQuestions.push(norm);
+                    });
+
+                    // Perform database bulk import & deduplication
+                    const result = await importQuestionsToExistingTest(targetTestIdForImport, validatedQuestions);
+                    if (result.success) {
+                        let msg = `Successfully imported ${result.addedCount} new questions into "${testTitle}"!`;
+                        if (result.updatedCount > 0) {
+                            msg += ` (${result.updatedCount} duplicate questions updated/ignored)`;
+                        }
+                        showToast(msg, "success", 4000);
+                        renderAnalytics();
+                    } else {
+                        showToast(result.message || "Failed to import questions.", "error");
+                    }
+                } catch (err) {
+                    showToast(`Import Failed: ${err.message}`, "error", 5000);
+                }
+                existingQFileInput.value = '';
+                targetTestIdForImport = null;
+            };
+            reader.readAsText(file);
+        });
 
         // Bind Export Action
         paneAnalytics.querySelectorAll(".export-test-btn").forEach(btn => {
@@ -237,6 +312,7 @@ export function renderAdminDashboard(user) {
         });
 
     }
+
 
     // -------------------------------------------------------------
     // RENDER: Test Builder Tab
@@ -461,192 +537,60 @@ export function renderAdminDashboard(user) {
                         if (Array.isArray(parsed)) {
                             items = parsed;
                         } else if (typeof parsed === 'object' && parsed !== null) {
-                            items = [parsed];
+                            if (Array.isArray(parsed.questions)) {
+                                items = parsed.questions;
+                            } else {
+                                items = [parsed];
+                            }
                         } else {
                             throw new Error("JSON must be a question object or an array of question objects.");
                         }
 
-                        // Validate and normalize each question
-                        const validated = [];
+                        if (items.length === 0) {
+                            throw new Error("JSON file contains no question objects.");
+                        }
+
+                        // Remove initial default empty question if present
+                        const isInitialEmpty = builderQuestions.length === 1 &&
+                                               !builderQuestions[0].text &&
+                                               (!builderQuestions[0].options || builderQuestions[0].options.every(o => !o));
+                        if (isInitialEmpty) {
+                            builderQuestions = [];
+                        }
+
+                        let addedCount = 0;
+                        let updatedCount = 0;
+
                         items.forEach((item, idx) => {
-                            if (!item.text || !item.type) {
-                                throw new Error(`Question #${idx + 1} is missing required fields (text, type).`);
-                            }
-                            
-                            const validTypes = ['single', 'multi', 'text', 'code'];
-                            if (!validTypes.includes(item.type)) {
-                                throw new Error(`Question #${idx + 1} has an invalid type: "${item.type}". Allowed types: ${validTypes.join(', ')}`);
-                            }
+                            const norm = validateAndNormalizeQuestion(item, idx);
 
-                            // Normalize the question object
-                            const normalized = {
-                                text: String(item.text),
-                                type: item.type,
-                                explanation: item.explanation ? String(item.explanation) : '',
-                                sectionName: item.sectionName ? String(item.sectionName) : (builderSections[0] ? builderSections[0].name : 'General'),
-                                sectionDuration: builderSections[0] ? builderSections[0].duration : 5
-                            };
-
-                            if (item.type === 'single' || item.type === 'multi') {
-                                if (!Array.isArray(item.options) || item.options.length < 2) {
-                                    throw new Error(`Question #${idx + 1} (choice question) must have an options array with at least 2 choices.`);
-                                }
-                                normalized.options = item.options.map(String);
-                                
-                                if (item.type === 'single') {
-                                    const rawAns = item.answer !== undefined ? item.answer : (Array.isArray(item.answers) ? item.answers[0] : 0);
-                                    let ansIdx = -1;
-                                    
-                                    // Try direct number check
-                                    const parsedNum = parseInt(rawAns, 10);
-                                    if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < normalized.options.length) {
-                                        ansIdx = parsedNum;
-                                    } else {
-                                        // Try string checks
-                                        const cleanAns = String(rawAns).trim();
-                                        
-                                        // Check 1: single letter match A, B, C, D...
-                                        const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^Answer:\s*\(([A-Z])\)$|^\(([A-Z])\)$/);
-                                        if (letterMatch) {
-                                            const letter = letterMatch[1] || letterMatch[2] || letterMatch[3];
-                                            const computedIdx = letter.charCodeAt(0) - 65; // 'A' is 65
-                                            if (computedIdx >= 0 && computedIdx < normalized.options.length) {
-                                                ansIdx = computedIdx;
-                                            }
-                                        }
-                                        
-                                        // Check 2: exact match in options (case insensitive)
-                                        if (ansIdx === -1) {
-                                            const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
-                                            if (matchedOptionIdx !== -1) {
-                                                ansIdx = matchedOptionIdx;
-                                            }
-                                        }
-                                        
-                                        // Check 3: substring match in options
-                                        if (ansIdx === -1) {
-                                            const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
-                                            if (matchedOptionIdx !== -1) {
-                                                ansIdx = matchedOptionIdx;
-                                            }
-                                        }
-                                    }
-                                    
-                                    if (ansIdx === -1) {
-                                        throw new Error(`Question #${idx + 1} (single-choice) has an invalid answer value: "${rawAns}". Cannot match with options.`);
-                                    }
-                                    normalized.answer = ansIdx;
-                                } else {
-                                    const rawAnswers = Array.isArray(item.answers) ? item.answers : (item.answer !== undefined ? [item.answer] : []);
-                                    if (rawAnswers.length === 0) {
-                                        throw new Error(`Question #${idx + 1} (multi-choice) must have an 'answers' array of options.`);
-                                    }
-                                    
-                                    normalized.answers = rawAnswers.map(rawAns => {
-                                        let ansIdx = -1;
-                                        
-                                        // Try direct number check
-                                        const parsedNum = parseInt(rawAns, 10);
-                                        if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < normalized.options.length) {
-                                            ansIdx = parsedNum;
-                                        } else {
-                                            const cleanAns = String(rawAns).trim();
-                                            
-                                            // Check 1: single letter match A, B, C, D...
-                                            const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^Answer:\s*\(([A-Z])\)$|^\(([A-Z])\)$/);
-                                            if (letterMatch) {
-                                                const letter = letterMatch[1] || letterMatch[2] || letterMatch[3];
-                                                const computedIdx = letter.charCodeAt(0) - 65;
-                                                if (computedIdx >= 0 && computedIdx < normalized.options.length) {
-                                                    ansIdx = computedIdx;
-                                                }
-                                            }
-                                            
-                                            // Check 2: exact match in options (case insensitive)
-                                            if (ansIdx === -1) {
-                                                const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
-                                                if (matchedOptionIdx !== -1) {
-                                                    ansIdx = matchedOptionIdx;
-                                                }
-                                            }
-                                            
-                                            // Check 3: substring match
-                                            if (ansIdx === -1) {
-                                                const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
-                                                if (matchedOptionIdx !== -1) {
-                                                    ansIdx = matchedOptionIdx;
-                                                }
-                                            }
-                                        }
-                                        
-                                        if (ansIdx === -1) {
-                                            throw new Error(`Question #${idx + 1} (multi-choice) has an invalid answer value: "${rawAns}". Cannot match with options.`);
-                                        }
-                                        return ansIdx;
-                                    });
-                                }
-                            } else if (item.type === 'text') {
-                                if (item.answer === undefined || item.answer === null) {
-                                    throw new Error(`Question #${idx + 1} (short text entry) must have an 'answer' string.`);
-                                }
-                                normalized.answer = String(item.answer);
-                            } else if (item.type === 'code') {
-                                if (!Array.isArray(item.options) || item.options.length < 2) {
-                                    throw new Error(`Question #${idx + 1} (code snippet choice) must have an 'options' array with at least 2 choices.`);
-                                }
-                                normalized.options = item.options.map(String);
-                                normalized.language = item.language ? String(item.language) : 'JavaScript';
-                                normalized.template = item.template ? String(item.template) : '';
-                                
-                                const rawAns = item.answer;
-                                if (rawAns === undefined || rawAns === null) {
-                                    throw new Error(`Question #${idx + 1} (code snippet choice) must have a correct 'answer' index or option text.`);
-                                }
-                                
-                                let ansIdx = -1;
-                                const parsedNum = parseInt(rawAns, 10);
-                                if (!isNaN(parsedNum) && parsedNum >= 0 && parsedNum < normalized.options.length) {
-                                    ansIdx = parsedNum;
-                                } else {
-                                    const cleanAns = String(rawAns).trim();
-                                    const letterMatch = cleanAns.toUpperCase().match(/^([A-Z])$|^Answer:\s*\(([A-Z])\)$|^\(([A-Z])\)$/);
-                                    if (letterMatch) {
-                                        const letter = letterMatch[1] || letterMatch[2] || letterMatch[3];
-                                        const computedIdx = letter.charCodeAt(0) - 65;
-                                        if (computedIdx >= 0 && computedIdx < normalized.options.length) {
-                                            ansIdx = computedIdx;
-                                        }
-                                    }
-                                    if (ansIdx === -1) {
-                                        const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase() === cleanAns.toLowerCase());
-                                        if (matchedOptionIdx !== -1) {
-                                            ansIdx = matchedOptionIdx;
-                                        }
-                                    }
-                                    if (ansIdx === -1) {
-                                        const matchedOptionIdx = normalized.options.findIndex(opt => opt.trim().toLowerCase().includes(cleanAns.toLowerCase()) || cleanAns.toLowerCase().includes(opt.trim().toLowerCase()));
-                                        if (matchedOptionIdx !== -1) {
-                                            ansIdx = matchedOptionIdx;
-                                        }
-                                    }
-                                }
-                                
-                                if (ansIdx === -1) {
-                                    throw new Error(`Question #${idx + 1} (code snippet choice) has an invalid answer value: "${rawAns}". Cannot match with options.`);
-                                }
-                                normalized.answer = ansIdx;
+                            let matchIdx = -1;
+                            if (norm.id) {
+                                matchIdx = builderQuestions.findIndex(q => q.id === norm.id);
+                            }
+                            if (matchIdx === -1 && norm.text) {
+                                const cleanT = norm.text.trim().toLowerCase();
+                                matchIdx = builderQuestions.findIndex(q => q.text && q.text.trim().toLowerCase() === cleanT);
                             }
 
-                            validated.push(normalized);
+                            if (matchIdx !== -1) {
+                                builderQuestions[matchIdx] = norm;
+                                updatedCount++;
+                            } else {
+                                builderQuestions.push(norm);
+                                addedCount++;
+                            }
                         });
 
-                        // Add questions and update
-                        builderQuestions.push(...validated);
                         renderBuilderQuestions();
-                        showToast(`Successfully imported ${validated.length} questions!`, "success");
+                        let msg = `Successfully imported ${addedCount} new questions into editor!`;
+                        if (updatedCount > 0) {
+                            msg += ` (${updatedCount} duplicate questions updated)`;
+                        }
+                        showToast(msg, "success", 4000);
 
                     } catch (err) {
-                        showToast(`Import Error: ${err.message}`, "error");
+                        showToast(`Import Error: ${err.message}`, "error", 5000);
                     }
                     questionsJsonInput.value = '';
                 };
@@ -2184,9 +2128,13 @@ function showJsonSchemaHelpModal() {
             <div class="modal-title" style="color: hsl(239, 84%, 67%); display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem;">
                 <i class="fas fa-info-circle"></i> Questions JSON Import Schema
             </div>
-            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0 1rem 0; line-height: 1.5;">
-                To import questions, upload a <code>.json</code> file containing either a single question object or an array of question objects matching the format below.
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0 0.5rem 0; line-height: 1.5;">
+                To import questions, upload a <code>.json</code> file containing either an array of question objects, a single question object, or a <code>{ "questions": [...] }</code> wrapper.
             </p>
+            <div style="background: rgba(6, 182, 212, 0.08); border-left: 3px solid hsl(190, 90%, 50%); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                <i class="fas fa-check-circle" style="color: hsl(190, 90%, 50%); margin-right: 0.25rem;"></i>
+                <strong>Smart Deduplication:</strong> Existing questions matching by <code>id</code> or exact question text will be automatically updated/ignored to avoid duplicates.
+            </div>
             <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; max-height: 320px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: var(--text-primary); border: 1px solid var(--border-color); line-height: 1.6;">
                 <pre><code id="schema-code-block">[
   {

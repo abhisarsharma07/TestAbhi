@@ -472,6 +472,77 @@ export async function saveTests(tests) {
     await batch.commit();
 }
 
+/**
+ * Bulk import validated questions directly into an existing test in Firestore.
+ * Handles deduplication by Question ID or Normalized Question Text.
+ * 
+ * @param {string} testId - ID of the target test
+ * @param {Array<Object>} newQuestions - Array of validated & normalized question objects
+ * @returns {Promise<{success: boolean, message?: string, totalParsed?: number, addedCount?: number, updatedCount?: number, skippedCount?: number}>}
+ */
+export async function importQuestionsToExistingTest(testId, newQuestions) {
+    const tests = cache.tests;
+    const testIndex = tests.findIndex(t => t.id === testId);
+
+    if (testIndex === -1) {
+        return { success: false, message: `Test with ID "${testId}" not found.` };
+    }
+
+    const targetTest = tests[testIndex];
+    if (!Array.isArray(targetTest.questions)) {
+        targetTest.questions = [];
+    }
+
+    let addedCount = 0;
+    let updatedCount = 0;
+    let skippedCount = 0;
+
+    newQuestions.forEach((item) => {
+        let matchIndex = -1;
+
+        // 1. Check ID match if item.id exists
+        if (item.id) {
+            matchIndex = targetTest.questions.findIndex(q => q.id === item.id);
+        }
+
+        // 2. Check Text match if no ID match found
+        if (matchIndex === -1 && item.text) {
+            const cleanText = item.text.trim().toLowerCase();
+            matchIndex = targetTest.questions.findIndex(q => q.text && q.text.trim().toLowerCase() === cleanText);
+        }
+
+        if (matchIndex !== -1) {
+            // Update existing question with imported fields, preserving existing ID if present
+            const existingId = targetTest.questions[matchIndex].id;
+            targetTest.questions[matchIndex] = {
+                ...item,
+                id: item.id || existingId || `q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+            };
+            updatedCount++;
+        } else {
+            // Add new question card with guaranteed unique ID
+            const newQ = {
+                ...item,
+                id: item.id || `q-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+            };
+            targetTest.questions.push(newQ);
+            addedCount++;
+        }
+    });
+
+    // Save updated test list to Firestore
+    await saveTests(tests);
+
+    return {
+        success: true,
+        totalParsed: newQuestions.length,
+        addedCount,
+        updatedCount,
+        skippedCount
+    };
+}
+
+
 export async function saveUsers(users) {
     cache.users = users;
     const batch = writeBatch(db);
