@@ -3,7 +3,7 @@
 ------------------------------------------------------------- */
 
 import { getTests, saveTests, getProctorLogs, fetchAllProctorLogs, importQuestionsToExistingTest } from '../db.js';
-import { formatDate, showToast, formatQuestionText, validateAndNormalizeQuestion } from '../utils.js';
+import { formatDate, showToast, formatQuestionText, validateAndNormalizeQuestion, escapeHtml } from '../utils.js';
 import { navigate } from '../app.js';
 
 export function renderAdminDashboard(user) {
@@ -2217,8 +2217,11 @@ function showJsonSchemaHelpModal() {
         </div>
     `;
 
-    overlay.querySelector("#modal-help-close").addEventListener("click", () => {
-        overlay.remove();
+    const closeModal = () => overlay.remove();
+
+    overlay.querySelector("#modal-help-close").addEventListener("click", closeModal);
+    overlay.addEventListener("click", (e) => {
+        if (e.target === overlay) closeModal();
     });
 
     overlay.querySelector("#modal-help-copy").addEventListener("click", () => {
