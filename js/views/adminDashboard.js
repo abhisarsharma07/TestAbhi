@@ -2121,64 +2121,79 @@ async function extractTextFromPDF(file) {
 
 // Display questions JSON schema specification guide modal
 function showJsonSchemaHelpModal() {
+    const sampleQuestions = [
+        {
+            "id": "q-101",
+            "text": "Which built-in JavaScript method converts a JSON string into an object?",
+            "type": "single",
+            "options": [
+                "JSON.stringify()",
+                "JSON.parse()",
+                "JSON.toObject()",
+                "JSON.convert()"
+            ],
+            "answer": 1,
+            "explanation": "JSON.parse() deserializes a JSON string into a JavaScript object.",
+            "sectionName": "JavaScript Basics"
+        },
+        {
+            "id": "q-102",
+            "text": "Select all ES6 features introduced in ECMAScript 2015:",
+            "type": "multi",
+            "options": [
+                "Arrow Functions",
+                "Classes",
+                "Promises",
+                "async / await syntax"
+            ],
+            "answers": [0, 1, 2],
+            "explanation": "Arrow functions, Classes, and Promises were introduced in ES6. async/await came in ES8.",
+            "sectionName": "JavaScript Basics"
+        },
+        {
+            "text": "What is the capital of France?",
+            "type": "text",
+            "answer": "Paris",
+            "explanation": "Paris is the capital of France.",
+            "sectionName": "General Knowledge"
+        },
+        {
+            "text": "Write a function isEven(n) that checks if n is an even integer.",
+            "type": "code",
+            "language": "Python",
+            "template": "def isEven(n):\n    return n % 2 == 0",
+            "explanation": "Returns True if n is divisible by 2.",
+            "sectionName": "Coding"
+        }
+    ];
+
+    const sampleJsonString = JSON.stringify(sampleQuestions, null, 2);
+
     const overlay = document.createElement("div");
     overlay.className = "modal-overlay";
     overlay.innerHTML = `
-        <div class="modal-content" style="max-width: 650px; text-align: left; padding: 2rem;">
+        <div class="modal-content" style="max-width: 680px; text-align: left; padding: 2rem;">
             <div class="modal-title" style="color: hsl(239, 84%, 67%); display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem;">
-                <i class="fas fa-info-circle"></i> Questions JSON Import Schema
+                <i class="fas fa-file-code"></i> Questions JSON Format Example & Schema
             </div>
             <p style="font-size: 0.85rem; color: var(--text-secondary); margin: 0.5rem 0 0.5rem 0; line-height: 1.5;">
-                To import questions, upload a <code>.json</code> file containing either an array of question objects, a single question object, or a <code>{ "questions": [...] }</code> wrapper.
+                Below is a complete <strong>JSON Format Example</strong>. You can copy this code or click <strong>"Download Sample .json"</strong> to test uploading right away.
             </p>
             <div style="background: rgba(6, 182, 212, 0.08); border-left: 3px solid hsl(190, 90%, 50%); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 1rem;">
                 <i class="fas fa-check-circle" style="color: hsl(190, 90%, 50%); margin-right: 0.25rem;"></i>
-                <strong>Smart Deduplication:</strong> Existing questions matching by <code>id</code> or exact question text will be automatically updated/ignored to avoid duplicates.
+                <strong>Supported Types:</strong> <code>single</code> (MCQ), <code>multi</code> (Checkbox), <code>text</code> (Short Entry), and <code>code</code> (Coding Task). Answers accept indices (<code>0, 1</code>), text (<code>"Paris"</code>), or letters (<code>"A", "B"</code>).
             </div>
             <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; max-height: 320px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; color: var(--text-primary); border: 1px solid var(--border-color); line-height: 1.6;">
-                <pre><code id="schema-code-block">[
-  {
-    "text": "What is 2 + 2?",
-    "type": "single",
-    "options": ["3", "4", "5"],
-    "answer": 1,
-    "explanation": "2 + 2 is equal to 4.",
-    "sectionName": "General"
-  },
-  {
-    "text": "Which of these are programming languages?",
-    "type": "multi",
-    "options": ["Python", "HTML", "C++", "JSON"],
-    "answers": [0, 2],
-    "explanation": "Python and C++ are programming languages.",
-    "sectionName": "General"
-  },
-  {
-    "text": "What is the capital of France?",
-    "type": "text",
-    "answer": "Paris",
-    "explanation": "Paris is the capital of France.",
-    "sectionName": "General"
-  },
-  {
-    "text": "Write a function isOdd(n) that checks if n is odd.",
-    "type": "code",
-    "language": "Python",
-    "template": "def isOdd(n):\\n    pass",
-    "assertions": [
-      { "input": ["3"], "expected": "True" },
-      { "input": ["4"], "expected": "False" }
-    ],
-    "explanation": "Use modulo operator.",
-    "sectionName": "Coding"
-  }
-]</code></pre>
+                <pre><code id="schema-code-block">${escapeHtml(sampleJsonString)}</code></pre>
             </div>
-            <div class="modal-actions" style="display: flex; gap: 0.75rem; width: 100%; margin-top: 1.5rem;">
-                <button class="btn btn-secondary" id="modal-help-copy" style="flex: 1; justify-content: center;">
-                    <i class="far fa-copy"></i> Copy Schema
+            <div class="modal-actions" style="display: flex; gap: 0.75rem; width: 100%; margin-top: 1.5rem; flex-wrap: wrap;">
+                <button class="btn btn-secondary" id="modal-help-download" style="flex: 1; min-width: 170px; justify-content: center; border-color: rgba(6, 182, 212, 0.3); color: hsl(190, 90%, 50%);">
+                    <i class="fas fa-download"></i> Download Sample .json
                 </button>
-                <button class="btn btn-primary" id="modal-help-close" style="flex: 1; justify-content: center;">Close</button>
+                <button class="btn btn-secondary" id="modal-help-copy" style="flex: 1; min-width: 140px; justify-content: center;">
+                    <i class="far fa-copy"></i> Copy Example
+                </button>
+                <button class="btn btn-primary" id="modal-help-close" style="flex: 1; min-width: 100px; justify-content: center;">Close</button>
             </div>
         </div>
     `;
@@ -2188,10 +2203,22 @@ function showJsonSchemaHelpModal() {
     });
 
     overlay.querySelector("#modal-help-copy").addEventListener("click", () => {
-        const codeText = overlay.querySelector("#schema-code-block").innerText;
-        navigator.clipboard.writeText(codeText).then(() => {
-            showToast("Schema copied to clipboard!", "success");
+        navigator.clipboard.writeText(sampleJsonString).then(() => {
+            showToast("Sample JSON copied to clipboard!", "success");
         });
+    });
+
+    overlay.querySelector("#modal-help-download").addEventListener("click", () => {
+        const blob = new Blob([sampleJsonString], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "sample-questions.json";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        showToast("Sample questions JSON file downloaded!", "success");
     });
 
     document.body.appendChild(overlay);
