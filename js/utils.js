@@ -205,21 +205,35 @@ export function validateAndNormalizeQuestion(item, idx = 0) {
         }
         normalized.answer = String(item.answer).trim();
 
-    // Code question
+    // Code question (Coding Challenge)
     } else if (type === 'code') {
-        normalized.language = item.language ? String(item.language).trim() : 'JavaScript';
-        normalized.template = item.template ? String(item.template) : '';
+        normalized.language = item.language || item.lang ? String(item.language || item.lang).trim() : 'JavaScript';
+        
+        // Support template, code, snippet, or codeSnippet property aliases
+        const codeSnippet = item.template !== undefined ? item.template : 
+                            (item.code !== undefined ? item.code : 
+                            (item.snippet !== undefined ? item.snippet : 
+                            (item.codeSnippet !== undefined ? item.codeSnippet : '')));
+        normalized.template = String(codeSnippet);
 
-        if (Array.isArray(item.options) && item.options.length >= 2) {
-            normalized.options = item.options.map(o => String(o).trim());
-            const rawAns = item.answer !== undefined ? item.answer : 0;
-            const ansIdx = parseAnswerIndex(rawAns, normalized.options);
-            if (ansIdx === -1) {
-                throw new Error(`Question #${idx + 1} (code choice): Invalid answer "${rawAns}". Could not match with options.`);
-            }
+        // Support options or choices
+        const rawOpts = Array.isArray(item.options) ? item.options : (Array.isArray(item.choices) ? item.choices : null);
+        if (rawOpts && rawOpts.length >= 2) {
+            normalized.options = rawOpts.map(o => String(o).trim());
+        } else {
+            // Default choices for code question if not explicitly provided
+            normalized.options = ['true', 'false', 'undefined', 'null'];
+        }
+
+        const rawAns = item.answer !== undefined ? item.answer : 
+                      (item.correctAnswer !== undefined ? item.correctAnswer : 
+                      (item.correct !== undefined ? item.correct : 0));
+                      
+        const ansIdx = parseAnswerIndex(rawAns, normalized.options);
+        if (ansIdx !== -1) {
             normalized.answer = ansIdx;
-        } else if (item.answer !== undefined && item.answer !== null) {
-            normalized.answer = String(item.answer).trim();
+        } else {
+            normalized.answer = 0;
         }
 
         if (Array.isArray(item.assertions)) {

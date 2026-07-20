@@ -125,6 +125,9 @@ export function renderAdminDashboard(user) {
                         <button class="btn btn-secondary" id="import-test-btn" style="padding: 0.5rem 1rem; font-size: 0.85rem;">
                             <i class="fas fa-file-import"></i> Import Test JSON
                         </button>
+                        <button class="icon-btn" id="schema-help-analytics-btn" title="View Questions JSON Format Example & Schema" style="width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; margin-left: 0.5rem; border-color: rgba(6, 182, 212, 0.3); color: hsl(190, 90%, 50%);">
+                            <i class="fas fa-question-circle"></i>
+                        </button>
                         <input type="file" id="import-test-file-input" accept=".json" style="display: none;">
                     </div>
                 </div>
@@ -278,6 +281,14 @@ export function renderAdminDashboard(user) {
         // Bind Import actions
         const importBtn = paneAnalytics.querySelector("#import-test-btn");
         const fileInput = paneAnalytics.querySelector("#import-test-file-input");
+        const helpBtnAnalytics = paneAnalytics.querySelector("#schema-help-analytics-btn");
+
+        if (helpBtnAnalytics) {
+            helpBtnAnalytics.addEventListener("click", (e) => {
+                e.preventDefault();
+                showJsonSchemaHelpModal();
+            });
+        }
 
         importBtn.addEventListener("click", () => {
             fileInput.click();
@@ -2158,11 +2169,19 @@ function showJsonSchemaHelpModal() {
             "sectionName": "General Knowledge"
         },
         {
-            "text": "Write a function isEven(n) that checks if n is an even integer.",
+            "id": "q-104",
+            "text": "What will reverseString('hello') return if reverseString is defined as:",
             "type": "code",
-            "language": "Python",
-            "template": "def isEven(n):\n    return n % 2 == 0",
-            "explanation": "Returns True if n is divisible by 2.",
+            "language": "JavaScript",
+            "template": "function reverseString(str) {\n    return str.split('').reverse().join('');\n}",
+            "options": [
+                "'olleh'",
+                "'hello'",
+                "'loleh'",
+                "'hlelo'"
+            ],
+            "answer": 0,
+            "explanation": "Strings are split into an array, reversed, and joined back together.",
             "sectionName": "Coding"
         }
     ];
