@@ -56,10 +56,21 @@ export function renderTestInterface(user, test, onSubmitTest) {
                 sec.questions.push(q);
             });
         }
-        // Override initial question index to the first question of the first section
-        if (sections.length > 0) {
-            currentIdx = test.questions.indexOf(sections[0].questions[0]);
-        }
+
+        // Re-order test.questions array so questions are grouped strictly section by section
+        const orderedQuestions = [];
+        sections.forEach(sec => {
+            orderedQuestions.push(...sec.questions);
+        });
+        test.questions.forEach(q => {
+            if (!orderedQuestions.includes(q)) {
+                orderedQuestions.push(q);
+            }
+        });
+        test.questions = orderedQuestions;
+
+        // Set initial question index to the first question of section 1 (index 0)
+        currentIdx = 0;
     }
 
     // Answers tracker: maps question ID to student's answer
@@ -309,9 +320,13 @@ export function renderTestInterface(user, test, onSubmitTest) {
             `;
         }
 
+        const secQNumberLabel = isSectionWise && sections[currentSectionIdx]
+            ? `Section "${sections[currentSectionIdx].name}" — Question ${currentIdx - test.questions.indexOf(sections[currentSectionIdx].questions[0]) + 1} of ${sections[currentSectionIdx].questions.length}`
+            : `Question ${currentIdx + 1} of ${totalQuestions}`;
+
         questionCard.innerHTML = `
             <div class="question-block" style="${q.type === 'code' ? 'max-width: 100%;' : ''}">
-                <div class="question-number">Question ${currentIdx + 1} of ${totalQuestions}</div>
+                <div class="question-number">${secQNumberLabel}</div>
                 <div class="question-text">${formatQuestionText(q.text)}</div>
                 ${inputHtml}
             </div>
@@ -480,10 +495,21 @@ export function renderTestInterface(user, test, onSubmitTest) {
         window.removeEventListener("blur", handleBlur);
         document.removeEventListener("visibilitychange", handleVisibilityChange);
         document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+        document.removeEventListener("msfullscreenchange", handleFullscreenChange);
+
+        if (lockOverlay) {
+            lockOverlay.remove();
+            lockOverlay = null;
+        }
 
         // Exit Fullscreen
-        if (document.fullscreenElement) {
-            document.exitFullscreen().catch(err => console.warn(err));
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            if (document.exitFullscreen) {
+                document.exitFullscreen().catch(err => console.warn(err));
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            }
         }
 
         // Stop and clean up webcam
@@ -738,9 +764,75 @@ export function renderTestInterface(user, test, onSubmitTest) {
         }
     }
 
+    // Strict Fullscreen Lockdown Overlay
+    let lockOverlay = null;
+
+    function checkFullscreenLockdown() {
+        const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement);
+        
+        if (!isFullscreen) {
+            if (!lockOverlay) {
+                lockOverlay = document.createElement("div");
+                lockOverlay.id = "fullscreen-lockdown-overlay";
+                lockOverlay.style.cssText = `
+                    position: fixed;
+                    top: 0; left: 0; width: 100vw; height: 100vh;
+                    background: rgba(15, 23, 42, 0.97);
+                    backdrop-filter: blur(16px);
+                    -webkit-backdrop-filter: blur(16px);
+                    z-index: 999999;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 2rem;
+                    text-align: center;
+                    color: #f8fafc;
+                `;
+                lockOverlay.innerHTML = `
+                    <div style="background: rgba(239, 68, 68, 0.15); border: 2px solid hsl(355, 78%, 56%); width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 1.5rem;">
+                        <i class="fas fa-lock" style="font-size: 2.25rem; color: hsl(355, 78%, 60%);"></i>
+                    </div>
+                    <h2 style="font-size: 1.75rem; font-weight: 700; color: #ffffff; margin-bottom: 0.75rem;">
+                        Security Alert: Test Interface Locked
+                    </h2>
+                    <p style="font-size: 0.95rem; color: #94a3b8; max-width: 520px; line-height: 1.6; margin-bottom: 1.75rem;">
+                        You have exited <strong>Full Screen Mode</strong>. Answering questions is suspended and all test content is locked to maintain exam security.
+                    </p>
+                    <button id="reenter-fullscreen-btn" class="btn btn-primary" style="padding: 0.85rem 2rem; font-size: 1rem; display: inline-flex; align-items: center; gap: 0.75rem; background: linear-gradient(135deg, hsl(239, 84%, 67%), hsl(263, 90%, 65%)); box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4); cursor: pointer; border: none; border-radius: 8px;">
+                        <i class="fas fa-expand"></i> Re-enter Full Screen Mode
+                    </button>
+                    <p style="font-size: 0.75rem; color: #64748b; margin-top: 1.25rem;">
+                        Exiting full screen mode is logged automatically as a proctoring violation.
+                    </p>
+                `;
+                document.body.appendChild(lockOverlay);
+
+                const reenterBtn = lockOverlay.querySelector("#reenter-fullscreen-btn");
+                reenterBtn.addEventListener("click", () => {
+                    if (document.documentElement.requestFullscreen) {
+                        document.documentElement.requestFullscreen().catch(err => {
+                            console.warn("Fullscreen request error:", err);
+                        });
+                    } else if (document.documentElement.webkitRequestFullscreen) {
+                        document.documentElement.webkitRequestFullscreen();
+                    } else if (document.documentElement.msRequestFullscreen) {
+                        document.documentElement.msRequestFullscreen();
+                    }
+                });
+            }
+        } else {
+            if (lockOverlay) {
+                lockOverlay.remove();
+                lockOverlay = null;
+            }
+        }
+    }
+
     function handleFullscreenChange() {
-        if (!document.fullscreenElement) {
-            handleProctorViolation("Exited Fullscreen Mode (Security Check)");
+        checkFullscreenLockdown();
+        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+            handleProctorViolation("Exited Fullscreen Mode (Test Locked)");
         }
     }
 
@@ -782,6 +874,8 @@ export function renderTestInterface(user, test, onSubmitTest) {
     window.addEventListener("blur", handleBlur);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("msfullscreenchange", handleFullscreenChange);
 
     // Request Fullscreen
     if (document.documentElement.requestFullscreen) {
@@ -872,6 +966,9 @@ export function renderTestInterface(user, test, onSubmitTest) {
     renderSidebarGrid();
     startTimer();
     initWebcam();
+    setTimeout(() => {
+        checkFullscreenLockdown();
+    }, 150);
 
     return container;
 }
